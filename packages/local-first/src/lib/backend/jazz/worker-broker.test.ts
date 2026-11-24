@@ -1,7 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { SimulatedClock } from 'xstate'
 import type { WorkerRequestIdentity } from '../../contracts/worker-request.js'
-import { brokerHostClient, serveBrokerHost, serveBrowserWorkerHost } from './worker-broker.js'
+import {
+	brokerHostClient,
+	serveBrokerHost,
+	serveBrowserWorkerHost,
+	reloadWindowForJazzBuild
+} from './worker-broker.js'
 import { serveHostClose } from '../../worker/host-close.js'
 
 function required<Value>(value: Value | undefined): Value {
@@ -607,3 +612,51 @@ it.each(['read', 'write'])(
 		await f.client.close()
 	}
 )
+
+it('reloads once per worker build and allows a different build', () => {
+	const values = new Map<string, string>()
+	const reload = vi.fn()
+	vi.stubGlobal('sessionStorage', {
+		getItem: (key: string) => values.get(key) ?? null,
+		setItem: (key: string, value: string) => values.set(key, value)
+	})
+	vi.stubGlobal('window', { location: { reload } })
+	try {
+		expect(reloadWindowForJazzBuild('https://app.example/worker.old.js')).toBe(true)
+		expect(reloadWindowForJazzBuild('https://app.example/worker.old.js')).toBe(false)
+		expect(reloadWindowForJazzBuild('https://app.example/worker.next.js')).toBe(true)
+		expect(reload).toHaveBeenCalledTimes(2)
+	} finally {
+		vi.unstubAllGlobals()
+	}
+})
+it('keeps reload available when session storage is unavailable', () => {
+	const reload = vi.fn()
+	vi.stubGlobal('sessionStorage', {
+		getItem: () => {
+			throw new Error('Storage denied')
+		}
+	})
+	vi.stubGlobal('window', { location: { reload } })
+	try {
+		expect(reloadWindowForJazzBuild('old-build')).toBe(true)
+		expect(reload).toHaveBeenCalledOnce()
+	} finally {
+		vi.unstubAllGlobals()
+	}
+})
+it('reports a failed native reload instead of acknowledging success', () => {
+	vi.stubGlobal('sessionStorage', { getItem: () => null, setItem: () => {} })
+	vi.stubGlobal('window', {
+		location: {
+			reload: () => {
+				throw new Error('Reload denied')
+			}
+		}
+	})
+	try {
+		expect(reloadWindowForJazzBuild('old-build')).toBe(false)
+	} finally {
+		vi.unstubAllGlobals()
+	}
+})

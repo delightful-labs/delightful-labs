@@ -5,7 +5,7 @@ import permissions from '../../jazz.permissions.json' with { type: 'json' }
 
 const session = {
 	user_id: 'internal-transfer-delete-local-test',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies import('jazz-tools/testing').PolicyTestSession
 let fixture: PolicyTestApp | undefined

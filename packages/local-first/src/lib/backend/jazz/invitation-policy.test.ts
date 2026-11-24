@@ -7,17 +7,17 @@ import {
 
 const owner = {
 	user_id: 'notebook-owner',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies PolicyTestSession
 const member = {
 	user_id: 'notebook-member',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies PolicyTestSession
 const outsider = {
 	user_id: 'notebook-outsider',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies PolicyTestSession
 let fixture: PolicyTestApp

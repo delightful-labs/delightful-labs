@@ -5,8 +5,9 @@ import { openAddLink } from '../add-link.js'
 import { readingControls, closeReadingControls, visibleReadingParagraph } from '../reader-ui.js'
 import { app } from '../../src/lib/backend/jazz/jazz.generated.js'
 import { resumeObservationsSchema } from '../../src/lib/reader/schema.js'
+import { diagnosticText } from '../../src/lib/diagnostics/machines.js'
 import { test, expect, chromium, firefox, webkit } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Page, BrowserContext } from '@playwright/test'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -175,10 +176,22 @@ for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit }
 
 test('production shell survives abrupt application worker termination and a full offline restart, then syncs to a restored profile', async ({
 	browser
-}) => {
+}, info) => {
 	const profile = await mkdtemp(join(tmpdir(), 'clipper-full-offline-'))
 	let context = await chromium.launchPersistentContext(profile, { headless: true })
 	const independent = await browser.newContext()
+	const diagnostics: { realm: string; message: string }[] = []
+	const observe = (context: BrowserContext, realm: string) => {
+		context.on('console', (message) => {
+			if (message.type() === 'error' || message.type() === 'warning')
+				diagnostics.push({ realm, message: diagnosticText(message.text()) })
+		})
+		context.on('weberror', (error) =>
+			diagnostics.push({ realm, message: diagnosticText(error.error().message) })
+		)
+	}
+	observe(context, 'source')
+	observe(independent, 'restored')
 	try {
 		// Retain only the test's real application worker so termination skips its
 		// SHUTDOWN protocol. Production asset caching remains completely unchanged.
@@ -344,6 +357,7 @@ test('production shell survives abrupt application worker termination and a full
 		await context.close()
 		await ui.stop()
 		context = await chromium.launchPersistentContext(profile, { headless: true })
+		observe(context, 'source-reopened')
 		await context.setOffline(true)
 		const reopened = await context.newPage()
 		await clearHttpCache(reopened)
@@ -543,6 +557,11 @@ test('production shell survives abrupt application worker termination and a full
 			restored.getByRole('article').getByRole('heading', { name: 'Offline structure' })
 		).toBeVisible()
 	} finally {
+		if (diagnostics.length)
+			await info.attach('offline-reconnect-diagnostics', {
+				body: JSON.stringify(diagnostics),
+				contentType: 'application/json'
+			})
 		await independent.close()
 		await context.close()
 		await rm(profile, { recursive: true, force: true })

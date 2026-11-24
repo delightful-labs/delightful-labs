@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 import { copyHistoricalSource } from './history-source.mjs'
 
 export function portRuntimeImports(path, lib, runtimeEntry, clipper) {
@@ -50,9 +50,11 @@ export async function checkSchema(directory, source, proof, versions, scope, sdk
 	const schemaPath = clipper ? 'src/lib/backend/jazz' : 'src/lib'
 	const prefix = clipper ? 'clipper-' : ''
 	const legacy = join(directory, 'legacy')
+	const baseline = join(directory, 'baseline')
 	const app = join(directory, 'app')
 	for (const [path, sdk] of [
 		[legacy, '2.0.0-alpha.60'],
+		[baseline, '2.0.0-alpha.67'],
 		[app, 'file:../candidate-sdk.tgz']
 	]) {
 		mkdirSync(path)
@@ -81,9 +83,6 @@ export async function checkSchema(directory, source, proof, versions, scope, sdk
 		cpSync(join(proof, 'backup-seed.mjs'), join(legacy, 'backup-seed.mjs'))
 		run(['exec', 'node', 'backup-seed.mjs', app], legacy)
 	}
-	// The legacy compiler supplies comparison metadata only; it is never a live rollout.
-	run(['add', '--ignore-scripts', 'jazz-tools@2.0.0-alpha.65'], legacy)
-	run(['exec', 'jazz-tools', 'validate', '--schema-dir', schemaPath], legacy)
 	cpSync(join(proof, 'fixtures', scope), app, { recursive: true })
 	// Only copied callers move from authoring schema.ts to native runtime queries.
 	const lib = join(app, schemaPath)
@@ -106,6 +105,7 @@ export async function checkSchema(directory, source, proof, versions, scope, sdk
 	}
 	run(['exec', 'jazz-tools', 'generate', '--schema-dir', schemaPath], app)
 	run(['exec', 'jazz-tools', 'generate', '--check', '--schema-dir', schemaPath], app)
+	run(['exec', 'jazz-tools', 'generate', '--schema-dir', schemaPath], baseline)
 	run(['exec', 'tsc', '--project', 'tsconfig.schema.json'], app)
 	const installed = createRequire(join(app, 'package.json'))
 	const sdk = dirname(installed.resolve('jazz-tools/package.json'))
@@ -115,24 +115,30 @@ export async function checkSchema(directory, source, proof, versions, scope, sdk
 		JSON.parse(readFileSync(join(dirname(core), 'package.json'), 'utf8')).version,
 		sdkVersion
 	)
-	// Use the pinned SDK upgrader's own identity comparison, not an application hash model.
-	const { artifactIdentity, identityDifferences } = await import(
-		pathToFileURL(join(sdk, 'dist/upgrade/index.js'))
-	)
-	const identity = (path) =>
-		artifactIdentity(
-			readFileSync(join(path, 'jazz.app.json'), 'utf8'),
-			readFileSync(join(path, 'jazz.permissions.json'), 'utf8')
+	// Beta removed the private upgrade helper. Compare each version's native
+	// compiler output, including schema history, migrations and transforms.
+	const compile = (path) => {
+		const output = execFileSync(
+			'pnpm',
+			['exec', 'jazz-tools', 'schema', 'compile', '--schema-dir', schemaPath],
+			{ cwd: path, encoding: 'utf8' }
 		)
-	const before = await identity(join(legacy, schemaPath))
-	const after = await identity(lib)
+		writeFileSync(join(path, 'compiled-schema.json'), output)
+		return JSON.parse(output)
+	}
+	const before = compile(baseline)
+	const after = compile(app)
 	const retained = JSON.parse(readFileSync(join(app, 'retained-baseline.json'), 'utf8'))
-	assert.equal(after.current, retained.schemaHash)
-	assert.deepEqual(identityDifferences(before, after), [])
+	assert.deepEqual(after, before)
+	assert.ok(after.schema.schemas.some((schema) => schema.hash === retained.schemaHash))
+	assert.deepEqual(
+		JSON.parse(readFileSync(join(lib, 'jazz.permissions.json'), 'utf8')).tables,
+		JSON.parse(readFileSync(join(baseline, schemaPath, 'jazz.permissions.json'), 'utf8')).tables
+	)
 	json(join(directory, 'schema-identity.json'), {
 		alpha60: retained.schemaHash,
-		alpha65: before,
-		[sdkVersion.replace('2.0.0-alpha.', 'alpha')]: after
+		'2.0.0-alpha.67': before.schema,
+		[sdkVersion]: after.schema
 	})
 	run(['exec', 'vitest', 'run', '--config', 'vitest.schema.config.mjs'], app)
 }

@@ -22,7 +22,7 @@ import { captureDocumentRecord } from './document-record.js'
 import type { CaptureDocument, ArticleDraft, LibraryArticle } from '../../contracts/articles.js'
 
 import { app } from './jazz.generated.js'
-import { documentsQuery } from './queries.js'
+import { documentsQuery, capturedDocumentsQuery, pendingCapturedDocumentsQuery } from './queries.js'
 /** Reads stay bound to this DB/library; owning actors gate admission and late-result consumption.
  * Native write admission and commit scope protection live in transactionLifecycle. */
 export function createArticleRecords(
@@ -146,9 +146,10 @@ export function createArticleRecords(
 		isCurrent,
 		articles: (next, error) =>
 			db.subscribe(
-				documentsQuery.where({ libraryId }),
+				capturedDocumentsQuery.where({ libraryId }),
 				{
-					onUpdate: (rows) => next(rows.map((row) => captureDocumentRecord(row, libraryId))),
+					onUpdate: (rows) =>
+						next(rows.map((row) => captureDocumentRecord(row.document, libraryId))),
 					onError: error
 				},
 				{ tier: ReadTier.LocalFirst }
@@ -174,10 +175,10 @@ export function createArticleRecords(
 		}),
 		subscribePending: (next: (rows: CaptureDocument[]) => void, error: () => void) =>
 			db.subscribe(
-				documentsQuery.where({ libraryId, attachmentId: null }),
+				pendingCapturedDocumentsQuery.where({ libraryId }),
 				{
 					onUpdate: (rows) => {
-						next(rows.map((row) => captureDocumentRecord(row, libraryId)))
+						next(rows.map((row) => captureDocumentRecord(row.document, libraryId)))
 					},
 					onError: error
 				},

@@ -121,6 +121,7 @@ export function serveApplicationWorker(options: {
 		const input = options.account({
 			serverUrl,
 			env: 'clipper',
+			onNewerBuild: () => host?.send({ type: 'NEWER_BUILD', build: self.location.href }),
 			store: accountStore,
 			runtimeSources: { browserWorkerHost: broker }
 		})
@@ -174,7 +175,13 @@ export function serveApplicationWorker(options: {
 					return
 				}
 				const url = result.redirect
-				self.postMessage(url ? { type: 'NAVIGATE', url } : { type: 'CLOSED' })
+				self.postMessage(
+					result.reloadFrom
+						? { type: 'RELOAD', build: result.reloadFrom }
+						: url
+							? { type: 'NAVIGATE', url }
+							: { type: 'CLOSED' }
+				)
 			},
 			error: () => self.postMessage({ type: 'FAILED' })
 		})

@@ -475,3 +475,22 @@ export function brokerHostClient(
 		}
 	}
 }
+
+/** Window-only reload effect after the application worker reports clean closure.
+ * The immutable worker URL identifies the old build, including after an offline
+ * reload. Keep a marker so a cached old build cannot reload this tab in a loop. */
+export function reloadWindowForJazzBuild(build: string): boolean {
+	try {
+		const key = 'jazz:worker-reloaded-from'
+		if (sessionStorage.getItem(key) === build) return false
+		sessionStorage.setItem(key, build)
+	} catch {
+		// As with Jazz's native default, reload remains available without storage.
+	}
+	try {
+		window.location.reload()
+		return true
+	} catch {
+		return false
+	}
+}

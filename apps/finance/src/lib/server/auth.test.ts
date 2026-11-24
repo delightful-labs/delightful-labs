@@ -89,7 +89,7 @@ it('keeps native authentication records private from both guest and external Fin
 			)
 		)
 		const sessions: PolicyTestSession[] = [
-			{ user_id: 'finance-auth-guest', authMode: 'local-first', claims: {} },
+			{ user_id: 'finance-auth-guest', authMode: 'device-account', claims: {} },
 			{ user_id: userId, issuer: 'https://finance.invalid', authMode: 'external', claims: {} }
 		]
 		for (const session of sessions) {

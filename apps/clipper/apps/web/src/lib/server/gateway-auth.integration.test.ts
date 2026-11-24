@@ -102,8 +102,13 @@ it('admits signed registered guests and enforces private data policies', async (
 	const token = mintLocalFirstTokenFromSeed(owner.seed, endpoint, 300)
 	const db = owner.db
 	expect(await admission(token)).toBe(200)
-	expect(await backend.accountFor(request(token))).toBe(owner.user.accountId)
-	await expect(backend.forReqUser(request(token))).rejects.toThrow()
+	expect(await backend.accountFor(request(token))).toBeNull()
+	expect(await backend.accountFor(request(token), { deviceAccounts: true })).toBe(
+		owner.user.accountId
+	)
+	const scoped = await backend.forReqUser(request(token))
+	expect(scoped.getAuthState().session?.user).toBe(owner.user.accountId)
+	expect(await scoped.one(app.libraries.where({ id: stranger.user.accountId }))).toBeNull()
 	expect(
 		(await db.one(app.libraries.where({ id: owner.user.accountId }), { tier: 'remote' }))?.id
 	).toBe(owner.user.accountId)
@@ -119,7 +124,7 @@ it('admits signed registered guests and enforces private data policies', async (
 			.wait({ tier: 'global' })
 	).rejects.toThrow(/denied|rejected/i)
 })
-it('rejects absent, malformed, tampered, expired, foreign and unregistered proofs', async () => {
+it('refuses invalid proofs and admits a valid new device account natively', async () => {
 	const owner = await guest()
 	const token = mintLocalFirstTokenFromSeed(owner.seed, endpoint, 300)
 	const parts = token.split('.')
@@ -139,7 +144,7 @@ it('rejects absent, malformed, tampered, expired, foreign and unregistered proof
 		admission(mintLocalFirstTokenFromSeed(randomBytes(32).toString('base64url'), endpoint, 300))
 	])
 	// Only status codes enter assertions: never include identity secrets or JWTs.
-	expect(outcomes).toEqual([401, 401, 401, 401, 401, 401])
+	expect(outcomes).toEqual([401, 401, 401, 401, 401, 200])
 })
 it('allows the configured extension transport and refuses unlisted browser origins', async () => {
 	const owner = await guest()

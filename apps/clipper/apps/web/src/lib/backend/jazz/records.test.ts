@@ -20,7 +20,7 @@ afterAll(async () => {
 async function owner(name: string) {
 	const session = {
 		user_id: name,
-		authMode: 'local-first',
+		authMode: 'device-account',
 		claims: {}
 	} satisfies import('jazz-tools/testing').PolicyTestSession
 	const db = fixture.as(session),

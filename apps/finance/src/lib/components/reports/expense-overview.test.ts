@@ -58,7 +58,7 @@ function overview(transactions: TransactionRow[], transfers: WorkerTransferRecor
 			scope: 'org',
 			onfilterschange: () => {},
 			onPage: () => {},
-			pageHref: (page) => `/?page=${page}`
+			pageHref: (page: number) => `/?page=${page}`
 		}
 	}).body
 }

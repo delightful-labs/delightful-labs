@@ -263,3 +263,52 @@ it('an already queued deadline cannot override actual SDK closure when native ti
 		f.owner.stop()
 	}
 })
+
+it('publishes newer-build intent only after native broker release', async () => {
+	const held = Promise.withResolvers<{ scope: string; requestId: string }>()
+	const f = fixture(undefined, undefined, () => held.promise)
+	try {
+		f.actor.start()
+		f.actor.send({ type: 'NEWER_BUILD', build: 'worker.old.js' })
+		await waitFor(f.actor, (snapshot) => snapshot.matches('closingBroker'))
+		expect(f.actor.getSnapshot().output).toBeUndefined()
+		expect(f.close).toHaveBeenCalledOnce()
+		held.resolve({ scope: 'broker', requestId: 'closed' })
+		await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+		expect(f.actor.getSnapshot().output).toEqual({
+			outcome: 'closed',
+			redirect: undefined,
+			reloadFrom: 'worker.old.js'
+		})
+	} finally {
+		held.resolve({ scope: 'broker', requestId: 'closed' })
+		f.actor.stop()
+		f.owner.stop()
+	}
+})
+it('refuses newer-build reload when native session close fails', async () => {
+	const f = fixture()
+	f.close.mockRejectedValueOnce(new Error('Native close failed'))
+	try {
+		f.actor.start()
+		f.actor.send({ type: 'NEWER_BUILD', build: 'worker.old.js' })
+		await waitFor(f.actor, (snapshot) => snapshot.matches('failed'))
+		expect(f.actor.getSnapshot().output).toBeUndefined()
+	} finally {
+		f.actor.stop()
+		f.owner.stop()
+	}
+})
+it('does not replace an in-progress shutdown with newer-build reload', async () => {
+	const f = fixture()
+	try {
+		f.actor.start()
+		f.actor.send({ type: 'SHUTDOWN' })
+		f.actor.send({ type: 'NEWER_BUILD', build: 'worker.old.js' })
+		await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+		expect(f.actor.getSnapshot().output).toEqual({ outcome: 'closed', redirect: undefined })
+	} finally {
+		f.actor.stop()
+		f.owner.stop()
+	}
+})

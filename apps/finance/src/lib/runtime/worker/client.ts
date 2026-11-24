@@ -30,7 +30,10 @@ import {
 import { withQueryParams } from '../../domain/query-params.js'
 import { workspaceRoute } from '../../domain/workspace-routes.js'
 import { get, writable, type Readable } from 'svelte/store'
-import { serveBrowserWorkerHost } from 'delightful-local-first/backend/jazz/worker-broker'
+import {
+	serveBrowserWorkerHost,
+	reloadWindowForJazzBuild
+} from 'delightful-local-first/backend/jazz/worker-broker'
 import brokerUrl from '#jazz-broker-worker?sharedworker&url'
 import {
 	financeWorkerOpen,
@@ -139,7 +142,7 @@ export function createFinanceWorkerClient(
 	let revision = 0
 	const state = writable(emptyFinanceView())
 	let transportFailed = false
-	const fail = () => {
+	const setFailure = (canRetrySession: boolean) => {
 		transportFailed = true
 		// Keep receiving control receipts: a data fault never authorizes termination.
 		state.update((view) => ({
@@ -155,9 +158,10 @@ export function createFinanceWorkerClient(
 				busy: false,
 				feedback: 'sessionFailed'
 			},
-			canRetrySession: true
+			canRetrySession
 		}))
 	}
+	const fail = () => setFailure(true)
 	const receive = (event: MessageEvent<unknown>) => {
 		const decoded = financeWorkerReply.safeParse(event.data)
 		if (!decoded.success) {
@@ -223,7 +227,9 @@ export function createFinanceWorkerClient(
 			return
 		}
 		if (decoded.data.type === 'RELOAD_PAGE') {
-			window.location.reload()
+			if (decoded.data.build) {
+				if (!reloadWindowForJazzBuild(decoded.data.build)) setFailure(false)
+			} else window.location.reload()
 			return
 		}
 		if (decoded.data.type === 'NAVIGATE') {

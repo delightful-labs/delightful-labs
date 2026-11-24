@@ -69,7 +69,7 @@
 		"@xstate/svelte": "6.0.0-beta.0",
 		"delightful-local-first": "workspace:*",
 		"delightful-ui": "workspace:*",
-		"jazz-tools": "2.0.0-alpha.67",
+		"jazz-tools": "2.0.0-beta.1",
 		"layerchart": "^2.9.0",
 		"pica": "^10.0.3",
 		"tdesign-icons-svg": "^0.4.7",

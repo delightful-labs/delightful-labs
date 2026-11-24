@@ -48,7 +48,7 @@
 		"@xstate/test": "2.0.0-beta.0",
 		"delightful-ui": "workspace:*",
 		"fast-check": "4.10.2",
-		"jazz-tools": "2.0.0-alpha.67",
+		"jazz-tools": "2.0.0-beta.1",
 		"oxfmt": "0.76.0",
 		"oxlint": "1.91.0",
 		"publint": "0.3.25",
@@ -488,7 +488,7 @@
 		"better-auth": "1.7.22",
 		"@kingironman2011/better-auth-bsky": "0.3.2",
 		"delightful-ui": "0.0.25",
-		"jazz-tools": "2.0.0-alpha.67",
+		"jazz-tools": "2.0.0-beta.1",
 		"svelte": "^5.57.2",
 		"xstate": "6.0.0-beta.1"
 	},

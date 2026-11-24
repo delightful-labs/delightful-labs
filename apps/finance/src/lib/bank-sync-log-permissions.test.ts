@@ -21,17 +21,17 @@ import {
 
 const ownerSession = {
 	user_id: 'sync-log-owner',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies PolicyTestSession
 const adminSession = {
 	user_id: 'sync-log-admin',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies PolicyTestSession
 const viewerSession = {
 	user_id: 'sync-log-viewer',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies PolicyTestSession
 const organizationId = crypto.randomUUID(),

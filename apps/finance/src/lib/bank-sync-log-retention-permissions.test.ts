@@ -14,12 +14,12 @@ import { createActor, toPromise } from 'xstate'
 
 const ownerSession = {
 	user_id: 'retention-owner',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies PolicyTestSession
 const adminSession = {
 	user_id: 'retention-admin',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies PolicyTestSession
 const organizationId = crypto.randomUUID(),

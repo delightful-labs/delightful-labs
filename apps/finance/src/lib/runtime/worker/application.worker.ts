@@ -228,6 +228,7 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 					env: environment,
 					store,
 					initial: 'device',
+					onNewerBuild: () => application?.send({ type: 'NEWER_BUILD', build: self.location.href }),
 					runtimeSources: {
 						wasmUrl,
 						brokerWorkerUrl: brokerUrl,
@@ -271,8 +272,13 @@ self.addEventListener('message', (event: MessageEvent<unknown>) => {
 				next: publishView,
 				error: () => self.postMessage({ type: 'FAILED' }),
 				complete: () => {
-					if (application?.getSnapshot().output?.outcome === 'closed')
-						self.postMessage({ type: 'CLOSED' })
+					const result = application?.getSnapshot().output
+					if (result?.outcome === 'closed')
+						self.postMessage(
+							result.reloadFrom
+								? { type: 'RELOAD_PAGE', build: result.reloadFrom }
+								: { type: 'CLOSED' }
+						)
 				}
 			})
 			application.start()

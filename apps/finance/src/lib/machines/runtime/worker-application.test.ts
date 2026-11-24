@@ -3931,3 +3931,56 @@ describe('production shared workspace leases', () => {
 		}
 	})
 })
+
+describe('newer Jazz build handover', () => {
+	it('waits for the broker close receipt before publishing reload intent', async () => {
+		const f = fixture()
+		const held = Promise.withResolvers<void>()
+		f.closeBroker.mockImplementation(async () => {
+			await held.promise
+			return { scope: 'host', requestId: 'close-receipt' }
+		})
+		try {
+			await f.start()
+			f.actor.send({ type: 'NEWER_BUILD', build: 'worker.old.js' })
+			await vi.waitFor(() => expect(f.closeBroker).toHaveBeenCalledOnce())
+			expect(f.actor.getSnapshot().output).toBeUndefined()
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.closeAccountStore).toHaveBeenCalledOnce()
+			held.resolve()
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+			expect(f.actor.getSnapshot().output).toEqual({
+				outcome: 'closed',
+				reloadFrom: 'worker.old.js'
+			})
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
+	it('does not publish reload when native session close fails', async () => {
+		const f = fixture()
+		f.nativeClose.mockRejectedValueOnce(new Error('Native close failed'))
+		try {
+			await f.start()
+			f.actor.send({ type: 'NEWER_BUILD', build: 'worker.old.js' })
+			await waitFor(f.actor, (snapshot) => snapshot.matches('closeFailed'))
+			expect(f.actor.getSnapshot().output).toBeUndefined()
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
+	it('does not turn an already requested close into an automatic reload', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.actor.send({ type: 'CLOSE' })
+			f.actor.send({ type: 'NEWER_BUILD', build: 'worker.old.js' })
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+			expect(f.actor.getSnapshot().output).toEqual({ outcome: 'closed' })
+		} finally {
+			f.stop()
+		}
+	})
+})

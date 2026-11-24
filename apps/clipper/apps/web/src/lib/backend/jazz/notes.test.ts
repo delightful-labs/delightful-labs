@@ -14,7 +14,11 @@ beforeAll(async () => {
 })
 afterAll(async () => fixture?.shutdown())
 async function owner(name: string) {
-	const session = { user_id: name, authMode: 'local-first', claims: {} } satisfies PolicyTestSession
+	const session = {
+		user_id: name,
+		authMode: 'device-account',
+		claims: {}
+	} satisfies PolicyTestSession
 	const db = fixture.as(session),
 		libraryId = fixture.accountFor(session)
 	await db

@@ -141,6 +141,7 @@ type Context = Input & {
 	signOutRequest: SignOutRequest | undefined
 	signOutFeedback: FinanceAuthMessage | undefined
 	authAdmission: { revision: number; binding: object; pathname: string } | undefined
+	reloadFrom: string | undefined
 	providerDestination: string | undefined
 	offline: boolean
 	restoration:
@@ -474,7 +475,7 @@ export function createFinanceWorkerMachine({
 			input: types<Input>(),
 			context: types<Context>(),
 			meta: types<{ authMessage?: FinanceAuthMessage }>(),
-			output: types<{ outcome: 'closed' }>(),
+			output: types<{ outcome: 'closed'; reloadFrom?: string }>(),
 			events: {
 				BEGIN_AUTH: types<{ handle: string; sessionRevision: number }>(),
 				CONFIRM_AUTH: types<{ sessionRevision: number }>(),
@@ -568,6 +569,7 @@ export function createFinanceWorkerMachine({
 				SET_ALL_ACCOUNTS_SELECTED: types<WorkerCommandScope & { checked: boolean }>(),
 				SET_LEDGER_PAGE: types<WorkerCommandScope & { page: number }>(),
 				SET_LEDGER_FILTERS: types<WorkerCommandScope & { filters: TransactionListFilters }>(),
+				NEWER_BUILD: types<{ build: string }>(),
 				CLOSE: types(),
 				NATIVE_FAILED: types(),
 				READ_DISPOSAL_FAILED: types()
@@ -599,6 +601,7 @@ export function createFinanceWorkerMachine({
 			signedOutBinding: undefined,
 			signOutRequest: undefined,
 			signOutFeedback: undefined,
+			reloadFrom: undefined,
 			providerDestination: undefined,
 			offline: true,
 			recoveryNavigation: undefined,
@@ -629,7 +632,10 @@ export function createFinanceWorkerMachine({
 			readBinding: undefined,
 			sessionStatus: 'starting'
 		}),
-		output: () => ({ outcome: 'closed' }),
+		output: ({ context }) =>
+			context.reloadFrom
+				? { outcome: 'closed', reloadFrom: context.reloadFrom }
+				: { outcome: 'closed' },
 		invoke: [
 			{
 				id: 'oauth',
@@ -651,6 +657,11 @@ export function createFinanceWorkerMachine({
 			}
 		],
 		on: {
+			NEWER_BUILD: ({ context, event, value }, enq) => {
+				if (!matchesState('running', value) || context.reloadFrom) return
+				enq.raise({ type: 'CLOSE' })
+				return { context: { reloadFrom: event.build, providerDestination: undefined } }
+			},
 			SIGN_OUT: ({ context, event, value, children }, enq) => {
 				const ready = context.ready
 				const auth = selectFinanceAtprotoView(children.oauth?.getSnapshot())
