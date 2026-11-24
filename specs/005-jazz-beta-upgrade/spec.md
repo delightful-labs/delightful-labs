@@ -685,7 +685,10 @@ and restored-profile reconciliation, and packaged extension checks. B5's
 current-main local-store comparisons and snapshot recovery are complete with
 explicit snapshot authorization. Preview project/namespace/region, private worker
 transport and fresh-profile save/reload checks pass. Production destinations,
-retained browser profiles and external chunks remain open. The user explicitly
+original-profile upgrades and external chunks remain open. The user's actual
+Finance export also passes worker-owned restoration, exact data/history comparison
+and cold offline reopening; this provides a separate verified recovery route.
+The user explicitly
 excluded the older annotations store's migration. B6 has not started; production deployment
 is not authorized.
 
@@ -716,9 +719,12 @@ Remaining release work:
 1. Qualify hosted production and preview destinations on authorized complete
    snapshots, including every external chunk, and rehearse their recovery without
    relying on an older deployment/core. Local file/SQLite recovery is complete.
-2. Qualify representative retained user browser profiles through the coordinated
-   backend/browser/extension rollout. The disposable browser and packaged-extension
-   suites already pass; retained user profiles have not been opened or modified.
+2. Qualify the selected user recovery route and coordinated backend/browser/extension
+   rollout. The user's unchanged Finance export now passes actual worker-owned
+   restoration and cold offline reopening, as recorded below; locating an uncertain
+   old browser is no longer a prerequisite for that recovery path. Original-profile
+   upgrade remains untested. Choose existing-identity upgrade versus a new restored
+   workspace explicitly before changing the user's live environment.
 3. Preserve Finance's existing unknown-outcome protections and failure diagnostics.
    The four original workflows have passed on beta without retries; keep the
    intermittent issue open for actual error evidence rather than repeating green
@@ -894,6 +900,7 @@ node tests/worker-upgrade/retained-recovery.mjs /path/to/finance-readers /path/t
 node tests/worker-upgrade/retained-recovery.mjs /path/to/clipper-readers /path/to/snapshots clipper-main clipper
 node tests/worker-upgrade/inspect-retained-drive.mjs /path/to/read-only-mounts preview
 node tests/worker-upgrade/retained-recovery.mjs /path/to/finance-readers /path/to/copied-preview-snapshots preview finance beta1
+node tests/worker-upgrade/backup-file.mjs /path/to/finance-backup.dlf http://127.0.0.1:6194
 ```
 
 The prepared `retained-compare.mjs` uses separate scratch copies for alpha.67 and
@@ -932,9 +939,9 @@ whereas the user's earlier snapshot authorization covered local stores. No
 Sandbox was created. The user has been asked to approve this exact preview-only
 procedure for both apps. Production snapshot acquisition remains separately
 unauthorized; there is no attempt to route around the rejection through the SDK
-or a Drive fork. The retained-user-browser rehearsal is also waiting for the
-user to identify the browser and profile; no original profile has been opened
-or copied.
+or a Drive fork. The original-profile rehearsal was pending browser identification;
+the user's subsequent backup-based recovery path is recorded below. No original
+profile has been opened or copied.
 
 The preview stores already run beta, so alpha.67 cannot silently stand in for
 their pre-rehearsal baseline. `retained-recovery.mjs` now accepts an explicit
@@ -965,6 +972,73 @@ were removed. These are local tooling checks, not hosted recovery evidence.
 The proposed cloud capture must still establish its actual blob descriptor and
 complete chunk coverage. Current app configuration and a successful fresh-profile
 save do not establish the contents or recoverability of an existing Drive.
+
+### User-provided Finance export and verified browser recovery
+
+The user could not identify a working old browser and instead identified a recent
+Finance backup in Downloads, stating that the data has not changed since that
+backup. Of five matching files, the newest is `finance-backup (4).dlf`, modified
+November 7, 2026 at 20:35 local time, with 3,344,779 bytes. Its released envelope
+is version 1, containing a Finance workspace profile version 2 payload. The native
+envelope machine verifies integrity and the current Finance validator accepts
+the complete graph and embedded history. No password was required.
+
+The archive contains 619 financial records: 542 transactions, 22 accounts,
+16 categories, eight transfers, ten tags, 20 transaction-tag links and one
+workspace. Its one archive attachment contains 1,118,293 bytes of embedded source
+history; there are no financial file records in this particular archive.
+
+`apps/finance/tests/worker-upgrade/backup-file.mjs` is an opt-in real-file
+rehearsal against an already prepared disposable localhost E2E app. It accepts
+the archive path and local origin, uses a fresh temporary browser profile and
+private working copy, and drives the actual Restore Workspace → review → Create
+Workspace → Open Workspace UI. Restoration and Jazz sessions stay in the
+existing application worker. The read-only worker fixture now accepts an explicit
+restored workspace ID and read tier, retaining the original synthetic-name and
+Remote-tier defaults for existing tests.
+
+The actual Downloads archive passes these checks on beta.1 and Node 24.22.2:
+
+- Every restored business field and relationship matches all 619 original
+  records after reversing the restore plan's new IDs and owner mapping, including
+  every integer transaction amount, account/category/tag link and transfer.
+- The retained original payload matches byte-for-byte, including its source
+  attribution and complete embedded history attachment.
+- The new workspace is active with its intended single owner membership. A full
+  browser-process restart preserves the new identity, every restored row and
+  the exact retained source payload.
+- A second full process restart, with HTTP cache cleared and the browser offline,
+  loads the public shell from the service worker and reads the same rows and
+  source bytes through native LocalFirst queries. No page exception or attempted
+  foreign-origin request is observed.
+- The Downloads file remains byte-identical. Temporary profiles, archive copies,
+  planning resources and generated qualification modules are removed after success.
+  No financial row values, names, amounts, account IDs or digests enter Git or
+  public test output. Failure details remain in the private temporary directory.
+
+The reusable command also refuses missing arguments, nonlocal origins and origins
+with a path before opening a file. It uses current compiled public backup APIs
+and the existing SDK's esbuild; no new dependency or application behavior is
+introduced. The application build, test TypeScript and changed-source formatting
+pass. Both original synthetic v1/v2 restore tests also pass, retaining their
+default workspace selection and Remote-tier assertions.
+
+An initial attempt to start the reader app on `0.0.0.0` was rejected by automatic
+approval review because it would expose an app handling private financial data
+to the LAN. No server started from that attempt. The accepted alternative bound
+only `127.0.0.1:6194` in its own named tmux session, with ephemeral in-memory Jazz
+storage. All original servers, stores and browser profiles remain untouched.
+
+This establishes a recovery route for the user's actual Finance workspace without
+requiring them to identify an old browser. The released restore intentionally
+creates new row IDs, owner membership and current Jazz audit records, while
+retaining the original source attribution/history as immutable archive bytes.
+It does not recover an old sign-in credential or qualify an original-profile
+upgrade. The live restoration destination has not been changed. Hosted preview
+snapshot approval, production data qualification and production authorization
+remain separate; this user message did not approve the pending cloud snapshot
+procedure. All three CI workflows also completed successfully on prior tooling
+head `91ed9018`; subsequent qualification changes require their own CI result.
 
 ### Approved and completed local retained-data rehearsal
 

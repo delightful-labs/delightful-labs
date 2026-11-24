@@ -1,30 +1,33 @@
 import { fixtureWindow as window } from '../state.js'
 
-export const operation61 = async () => {
+export const operation61 = async (
+	workspaceId?: string,
+	tier: 'remote' | 'local-first' = 'remote'
+) => {
 	const { db, app, userId } = window.workspaceSettingsTest
-	const root = (await db.all(app.organizations, { tier: 'remote' })).find(
-		(row) => row.name === 'Exact household'
+	const root = (await db.all(app.organizations, { tier })).find((row) =>
+		workspaceId ? row.id === workspaceId : row.name === 'Exact household'
 	)
 	if (!root) throw new Error('Restored workspace not active')
 	const transactions = await db.all(app.transactions.where({ organizationId: root.id }), {
-		tier: 'remote'
+		tier
 	})
 	const files = await db.all(
 		app.files.where({ transactionId: { in: transactions.map((row) => row.id) } }),
-		{ tier: 'remote' }
+		{ tier }
 	)
 	const parts = await db.all(
 		app.fileParts.where({ fileId: { in: files.map((row) => row.id) } }).orderBy('partIndex'),
-		{ tier: 'remote' }
+		{ tier }
 	)
 	const operations = await db.all(app.restoreOperations.where({ workspaceId: root.id }), {
-		tier: 'remote'
+		tier
 	})
 	const operation = operations[0]
 	if (!operation || operations.length !== 1) throw new Error('Missing unique restore operation')
 	const sourceParts = await db.all(
 		app.fileParts.where({ fileId: operation.sourceFileId }).orderBy('partIndex'),
-		{ tier: 'remote' }
+		{ tier }
 	)
 	return {
 		identityId: userId,
@@ -38,32 +41,32 @@ export const operation61 = async () => {
 			transactions,
 			files,
 			accounts: await db.all(app.accounts.where({ organizationId: root.id }), {
-				tier: 'remote'
+				tier
 			}),
 			categories: await db.all(app.categories.where({ organizationId: root.id }), {
-				tier: 'remote'
+				tier
 			}),
-			tags: await db.all(app.tags.where({ organizationId: root.id }), { tier: 'remote' }),
-			checks: await db.all(app.checks.where({ organizationId: root.id }), { tier: 'remote' }),
+			tags: await db.all(app.tags.where({ organizationId: root.id }), { tier }),
+			checks: await db.all(app.checks.where({ organizationId: root.id }), { tier }),
 			internalTransfers: await db.all(app.internalTransfers.where({ organizationId: root.id }), {
-				tier: 'remote'
+				tier
 			}),
 			transactionTags: await db.all(app.transactionTags.where({ organizationId: root.id }), {
-				tier: 'remote'
+				tier
 			}),
 			transactionBatches: await db.all(app.transactionBatches.where({ organizationId: root.id }), {
-				tier: 'remote'
+				tier
 			}),
 			batchTemplates: await db.all(app.batchTemplates.where({ organizationId: root.id }), {
-				tier: 'remote'
+				tier
 			}),
 			transactionAttachments: await db.all(
 				app.transactionAttachments.where({ fileId: { in: files.map((row) => row.id) } }),
-				{ tier: 'remote' }
+				{ tier }
 			)
 		},
 		members: await db.all(app.organizationMembers.where({ organizationId: root.id }), {
-			tier: 'remote'
+			tier
 		}),
 		attachment: parts.flatMap((part) => [...(part.data ?? [])]),
 		sourceBytes: sourceParts.flatMap((part) => [...(part.data ?? [])])
