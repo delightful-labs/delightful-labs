@@ -136,16 +136,39 @@ test.afterAll(async () => {
 })
 
 for (const [engine, browserType] of Object.entries({ chromium, firefox, webkit })) {
-	test(`production worker opens the local library in ${engine}`, async () => {
+	test(`production worker provisions a fresh local library without authority in ${engine}`, async () => {
+		const existing = new Set((await authority.backend.db.all(app.libraries)).map((row) => row.id))
+		// Stop the actual SDK authority before this empty browser profile exists.
+		await stopAuthority()
 		const browser = await browserType.launch({ headless: true })
 		try {
 			const page = await browser.newPage()
 			await page.goto('http://127.0.0.1:5190')
-			await expectLibrarySynced(page)
 			await ready(page)
+			await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
 			await expect(page.getByRole('button', { name: 'Create account', exact: true })).toHaveCount(0)
+			const phrase = await readRecoveryPhrase(page)
+			expect(
+				phrase.trim().length,
+				'Fresh native identity exposes recovery material'
+			).toBeGreaterThan(0)
+			await page.reload()
+			await expect(page.getByRole('region', { name: 'Saved articles', exact: true })).toBeVisible()
+			const retained = await readRecoveryPhrase(page)
+			expect(retained === phrase, 'Offline first-use must retain its native identity').toBe(true)
+			await startAuthority()
+			// Reloading existing provenance has no new bootstrap-success announcement.
+			// Observe the serving authority's actual new root instead.
+			await expect
+				.poll(async () =>
+					(await authority.backend.db.all(app.libraries))
+						.filter((row) => !existing.has(row.id))
+						.map((row) => ({ canonical: row.id === row.ownerId, version: row.bootstrapVersion }))
+				)
+				.toEqual([{ canonical: true, version: '1' }])
 		} finally {
 			await browser.close()
+			await startAuthority()
 		}
 	})
 }

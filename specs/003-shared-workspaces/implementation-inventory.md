@@ -1226,3 +1226,38 @@ production builds pass. Hosted Foundation and Clipper qualifications passed on
 `948fa0e2`; Finance's two hosted failures were the dialog scope and arbitrary
 snapshot replay assertions addressed above. Final-head hosted results are tracked
 in PR #55, without treating older green jobs as proof of the changed head.
+
+
+## Fresh production first-use qualification and acceptance audit
+
+The three production first-use cases now stop the actual Jazz authority before
+creating an empty Chromium, Firefox or WebKit profile. Each app opens its local
+library without a signup control, exposes recovery, reloads while the authority
+remains stopped and retains its native identity. After reconnection, independent
+queries on the serving authority prove exactly one additional canonical private
+root with matching owner and bootstrap version. Existing provenance intentionally
+does not announce a second bootstrap success after reload; the reconciliation
+oracle checks stored rows. All twelve production offline cases pass with both
+matching production builds. This strengthens the existing cases without adding
+application logic or changing the native-case count.
+
+The numbered acceptance scenarios in `spec.md` have these concrete evidence
+boundaries. Local results and the latest exact-head hosted gates are distinct;
+current hosted results are recorded in PR #55.
+
+| Scenario | Implementation and qualification |
+| --- | --- |
+| 1. Automatic fresh local library | Shared initializer's canonical-root path; the three production first-use cases above start before any remote authority is reachable. |
+| 2. Full offline reopening | `tests/offline/shell.spec.ts` and `tests/offline/auth.spec.ts` retain local content, annotations and native identities through complete offline browser-process restarts and reconciliation. |
+| 3. Incomplete restored replica | `tests/workspace-startup.spec.ts` restores into empty independent stores, verifies missing local root/content, then saves offline or through an accepted unanswered connection at the original canonical ID; original and new content both reconcile. |
+| 4. Concurrent startup | Clipper independent browser replicas settle both actual root receipts and query one remote root. Finance independent native SDK replicas hold missing serializable reservations concurrently, converge once, preserve later graph edits and refuse an occupied canonical root. |
+| 5. Invalidation and retained drains | Shared resource-owner generated/controlled cases and both production bindings enforce exact leases. Native Finance retired-activation/held-write cases, Clipper A → B → A reader cases and later server permission rejection qualify native facts, refusal and real release receipts. |
+| 6. Web/extension agreement | Both use the same native account/library binding and canonical initializer. Packaged extension restoration/sign-in cases read subsequent captures in the independent web replica; unconfirmed, invalid and stale-account gestures remain refused. |
+| 7. Finance behavior | Native application, workspace/profile, permissions, cold offline/unanswered, seed/feature-flag and restoration suites retain exposed selection, financial policies and identity-only controls. Account-dialog tests separately prove retained-lease drafts and replacement clearing. |
+| 8. Storage authorization | Real policy SDK tests in `permissions.test.ts`, `articles.test.ts`, `document-records.test.ts` and `records.test.ts` refuse foreign roots/reads and cross-library references or atomic publication. Storage policies and schemas are unchanged. |
+| 9. Shared responsibility and removal | The current production map above identifies the same initializer, startup, observation and resource/selection owners in both apps. The obsolete startup/attachment/transaction charts and Clipper adoption handshake are removed; native graph, policy, routing and domain drains remain app bindings. |
+
+The evidence covers these scenarios and the recorded bounded schedules. It does
+not claim every possible browser interleaving. Cross-app database/membership
+linking, management UI, sharing, invitations, deployment and merging remain
+outside this implementation goal.
