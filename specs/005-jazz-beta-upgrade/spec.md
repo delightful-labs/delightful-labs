@@ -707,8 +707,9 @@ and reload-loop/failure behavior. Twelve additional actual schema-driven browser
 cases pass across both apps and all three engines, including cached-old-build
 loop prevention and data preservation through native release/reload.
 These fixtures use two schema-ordered beta builds. They do not establish live
-alpha/beta client coexistence or rollout of a retained user browser profile;
-those remain part of the coordinated release qualification.
+alpha/beta application-worker coexistence or rollout of a retained user browser
+profile. The separate native wire/account-store evidence below covers a narrower
+mixed-version path; browser/extension rollout remains unqualified.
 
 Remaining release work:
 
@@ -830,6 +831,51 @@ already-completed run; only two obsolete documentation-head workflows were
 explicitly canceled. The final head's CI refresh remains separate evidence in
 the linked checks. No canceled or queued check is reported as passing.
 
+Head `1af09e3b` subsequently completed all three hosted workflows successfully:
+Finance (18 jobs), Clipper (six jobs), and Foundation (four jobs), plus PR-title
+checks. This is exact-head hosted evidence, separate from the earlier superseded
+workflow. Main was fetched again and remains `9344dff2`.
+
+### Native mixed-version wire and account-store qualification
+
+The mixed-version investigation uses the existing prepared
+alpha.67/beta.1 Finance readers, their exact current schema and permissions, and
+matching published SDK/native versions. The maintained
+`apps/finance/tests/worker-upgrade/mixed-version.mjs` starts a disposable beta core
+and two separate Node client processes through public `createJazzClient`,
+`localFirst: 'now'`, AccountStore and database APIs. No administrative credential
+is given to a client; the SDK test authority seeds and revokes access.
+
+All three scenarios pass against the unchanged Finance policy:
+
+| Session path | Native identity setup | Observed result |
+| --- | --- | --- |
+| Backend users | Separate users enrolled by the beta test backend; each SDK uses its documented bearer callback. | Both versions remain active, exchange accepted edits and observe identical fields and all four audit values. |
+| Device accounts | Each SDK creates its own device account through the beta gateway, using an explicit test-only memory AccountStore. | Both versions read/write the shared authorized workspace; alpha's offline local edit reaches beta after reconnection. |
+| Retained alpha device account | Beta receives the exact opaque AccountStore record produced by alpha, without a manual metadata or key conversion. | Beta retains alpha's account ID; both active SDKs exchange edits, reconcile the offline edit, and refuse writes after their shared membership is revoked. |
+
+Every scenario verifies global acceptance, an offline edit remaining local until
+reconnection, later cross-version readback and permission refusal without
+changing the stored memo. Removing actual membership revocation makes the native
+negative control fail with `Missing expected rejection`; the passing source is
+restored byte-for-byte afterward. Each SDK session and child process closes and
+the disposable core stops before success is reported. The final three-scenario
+run completes with no remaining fixture process.
+
+The first probe incorrectly supplied a bearer string instead of the documented
+callback and was refused by the SDK. A later fixture-cleanup attempt awaited a
+child `close` notification that did not settle after IPC disconnection; awaiting
+the actual child exit corrected it. These are fixture corrections, not product
+or SDK changes. The probe uses no new dependency, application behavior, SDK patch,
+original store, user browser profile or persisted test key. AccountStore values
+stay opaque and transient; logs contain versions and comparison booleans.
+
+This establishes native wire/account metadata compatibility for the current
+Finance schema with a beta server and these two SDK versions. It does not
+qualify Clipper's full document/blob graph across versions, a persistent browser
+replica, application-worker/broker handover, installed extensions, original user
+profiles or complete hosted/chunk recovery. Those release gates remain open.
+
 The maintained fixture commands run from `apps/finance`:
 
 ```sh
@@ -839,6 +885,7 @@ node tests/worker-upgrade/run.mjs --worker
 node ../../scripts/jazz/verify-beta-broker.mjs /path/to/jazz-source-checkout
 node tests/worker-upgrade/retained-prepare.mjs /path/to/qualified-finance-artifacts
 node tests/worker-upgrade/retained-prepare.mjs /path/to/qualified-clipper-artifacts --clipper
+node tests/worker-upgrade/mixed-version.mjs /path/to/prepared-finance-readers
 node /path/to/prepared-readers/retained-compare.mjs /path/to/snapshots finance
 node tests/worker-upgrade/retained-recovery.mjs /path/to/finance-readers /path/to/snapshots finance finance
 node tests/worker-upgrade/retained-recovery.mjs /path/to/clipper-readers /path/to/snapshots clipper-main clipper
