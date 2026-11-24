@@ -9,11 +9,11 @@ import {
 	type WorkspaceCreationAttempt
 } from '../../domain/workspace-creation.js'
 import {
-	workspaceCreationTransaction,
-	type WorkspacePersistenceResult
-} from './workspace-creation-transaction.js'
+	workspaceBootstrapTransaction,
+	classifyBootstrapConcurrency
+} from './workspace-bootstrap-transaction.js'
 
-type Db = Pick<JazzDb, 'all' | 'beginTransaction' | 'getConfig'>
+type Db = Pick<JazzDb, 'all' | 'beginSerializableTransaction' | 'getConfig'>
 type Input = { db: Db; userId: string }
 
 type ReadInput = Input & { tier: typeof ReadTier.LocalFirst | typeof ReadTier.Remote }
@@ -49,8 +49,8 @@ export const workspaceInitialization = createWorkspaceInitialization<
 	Db,
 	ReadInput['tier'],
 	WorkspaceCreationAttempt,
-	WorkspacePersistenceResult,
-	import('xstate').SnapshotFrom<typeof workspaceCreationTransaction>
+	import('xstate').OutputFrom<typeof workspaceBootstrapTransaction>,
+	import('xstate').SnapshotFrom<typeof workspaceBootstrapTransaction>
 >({
 	tiers: { local: ReadTier.LocalFirst, authority: ReadTier.Remote },
 	discover,
@@ -59,5 +59,6 @@ export const workspaceInitialization = createWorkspaceInitialization<
 		identityId: attempt.profileId,
 		workspaceId: attempt.organizationId
 	}),
-	transaction: workspaceCreationTransaction
+	transaction: workspaceBootstrapTransaction,
+	reconcileBootstrap: classifyBootstrapConcurrency
 })

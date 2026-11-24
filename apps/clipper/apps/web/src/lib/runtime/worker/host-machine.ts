@@ -1,3 +1,7 @@
+import {
+	workspaceLibraryCommands,
+	refuseLibraryCommand
+} from '../../machines/runtime/workspace-library.js'
 import { atprotoMachine } from '../../machines/runtime/atproto.js'
 import type { EventPayload } from '../../machines/events.js'
 import {
@@ -34,6 +38,20 @@ import { REALM_CLOSE_POLICY } from './close-policy.js'
 import type { WorkerCloseIssue } from './close-policy.js'
 import { observeBrowserConnection } from '../../offline/browser.js'
 
+function sameRecovery(left: ApplicationBindingFacts, right: ApplicationBindingFacts) {
+	return (
+		left.recovery?.capability === right.recovery?.capability &&
+		left.recovery?.source === right.recovery?.source
+	)
+}
+export function selectIdentityCommandScope(
+	snapshot: import('xstate').SnapshotFrom<typeof workerHostMachine>
+) {
+	return identityCommandScope(snapshot.context)
+}
+function identityCommandScope(context: Context) {
+	return context.recovery ? required(context.recovery.sessionId) : context.scope
+}
 function required<T>(value: T | undefined): T {
 	if (value === undefined) throw new Error('Worker binding unavailable')
 	return value
@@ -190,7 +208,9 @@ export const workerHostMachine = setup({
 		suppliedRecovery: ({ event }: { event: Event }) =>
 			event.type === 'BIND_RECOVERY' && !!event.binding,
 		currentRecovery: ({ context, event }: { context: Context; event: Event }) =>
-			event.type === 'RECOVERY' && event.scope === context.scope && !!context.recovery,
+			event.type === 'RECOVERY' &&
+			event.scope === identityCommandScope(context) &&
+			!!context.recovery,
 		suppliedLibrary: ({ event }: { event: Event }) =>
 			event.type === 'BIND_LIBRARY' && !!event.library,
 		resettingTags: ({ context, event }: { context: Context; event: Event }) =>
@@ -198,19 +218,8 @@ export const workerHostMachine = setup({
 			event.event.type === 'RESET' &&
 			event.scope === context.scope &&
 			!!context.tagForm,
-		currentAccount: ({
-			context,
-			event,
-			value
-		}: {
-			context: Context
-			event: Event
-			value: import('xstate').StateValue
-		}) =>
-			'scope' in event &&
-			event.scope === context.scope &&
-			!matchesState({ running: { accepting: 'retiring' } }, value) &&
-			!matchesState({ running: { accepting: 'identifying' } }, value),
+		currentAccount: ({ context, event }: { context: Context; event: Event }) =>
+			'scope' in event && event.scope === identityCommandScope(context),
 		currentReader: ({ context, event }: { context: Context; event: Event }) =>
 			event.type === 'ATTACH_BOUND' &&
 			event.scope === context.scope &&
@@ -228,8 +237,8 @@ export const workerHostMachine = setup({
 	id: 'worker-host',
 	initial: 'running',
 	context: ({ input }) => ({
-		pending: { library: undefined, recovery: undefined },
-		activeBinding: { library: undefined, recovery: undefined },
+		pending: { library: undefined, recovery: undefined, commands: undefined },
+		activeBinding: { library: undefined, recovery: undefined, commands: undefined },
 		pendingScope: undefined,
 		bindingGeneration: 0,
 		facts: undefined,
@@ -317,14 +326,17 @@ export const workerHostMachine = setup({
 							initial: 'waiting',
 							entry: ({ context }, enq) => {
 								enq.stop(context.tagForm)
-								enq.stop(context.recovery)
+								if (!sameRecovery(context.activeBinding, context.pending))
+									enq.stop(context.recovery)
 								for (const slot of context.surfaces) enq.sendTo(slot.child, { type: 'SHUTDOWN' })
 								return {
 									context: {
 										library: undefined,
 										facts: undefined,
 										tagForm: undefined,
-										recovery: undefined,
+										recovery: sameRecovery(context.activeBinding, context.pending)
+											? context.recovery
+											: undefined,
 										tagArticleId: ''
 									}
 								}
@@ -355,10 +367,25 @@ export const workerHostMachine = setup({
 								BINDING_IDENTIFIED: ({ context, event }, enq) => {
 									if (event.generation !== context.bindingGeneration) return
 									const library = context.pending.library
-									const recovery = context.pending.recovery
-										? enq.spawn(createRecoveryOwner(context.pending.recovery), { input: undefined })
+									if (!sameRecovery(context.activeBinding, context.pending))
+										enq.stop(context.recovery)
+									const recovery =
+										sameRecovery(context.activeBinding, context.pending) && context.recovery
+											? context.recovery
+											: context.pending.recovery
+												? enq.spawn(createRecoveryOwner(context.pending.recovery), {
+														input: undefined
+													})
+												: undefined
+									const tagForm = library
+										? enq.spawn('tagForm', {
+												input: {
+													library: context.pending.commands
+														? workspaceLibraryCommands(context.pending.commands)
+														: { send: refuseLibraryCommand }
+												}
+											})
 										: undefined
-									const tagForm = library ? enq.spawn('tagForm', { input: { library } }) : undefined
 									return {
 										target: 'bound',
 										context: {
@@ -395,14 +422,14 @@ export const workerHostMachine = setup({
 								handle: args.event.handle,
 								authorizationScope: args.event.authorizationScope
 							})
-							return { context: { oauthScope: args.context.scope } }
+							return { context: { oauthScope: identityCommandScope(args.context) } }
 						},
 						OAUTH_RETURNED: ({ context }, enq) => {
 							enq(() => context.input.authReturned?.())
 						},
 						OAUTH_REDIRECT: ({ context, event, value }, enq) => {
 							if (
-								context.oauthScope !== context.scope ||
+								context.oauthScope !== identityCommandScope(context) ||
 								matchesState({ running: { accepting: 'retiring' } }, value) ||
 								matchesState({ running: { accepting: 'identifying' } }, value)
 							)
@@ -435,7 +462,11 @@ export const workerHostMachine = setup({
 						BIND_RECOVERY: ({ context, event }) => ({
 							target: '.retiring',
 							context: {
-								pending: { library: context.library, recovery: event.binding },
+								pending: {
+									library: context.library,
+									recovery: event.binding,
+									commands: context.activeBinding.commands
+								},
 								pendingScope: undefined,
 								bindingGeneration: context.bindingGeneration + 1
 							}
@@ -453,7 +484,11 @@ export const workerHostMachine = setup({
 						BIND_LIBRARY: ({ context, event }) => ({
 							target: '.retiring',
 							context: {
-								pending: { library: event.library, recovery: context.activeBinding.recovery },
+								pending: {
+									library: event.library,
+									recovery: context.activeBinding.recovery,
+									commands: undefined
+								},
 								pendingScope: event.scope,
 								bindingGeneration: context.bindingGeneration + 1
 							}
@@ -470,13 +505,11 @@ export const workerHostMachine = setup({
 						LIBRARY: (args, enq) => {
 							if (!args.guards.currentLibrary(args)) return
 							const { context, event } = args
-							enq.sendTo(
-								required(context.library),
-								(({ event }) => {
-									if (event.type !== 'LIBRARY') throw new Error('Library intent unavailable')
-									return event.event
-								})(args)
-							)
+							if (!context.activeBinding.commands) {
+								enq(refuseLibraryCommand, event.event)
+								return
+							}
+							enq(workspaceLibraryCommands(context.activeBinding.commands).send, event.event)
 							return {
 								context: ['QUERY', 'FILTER', 'TAG_FILTER'].includes(event.event.type)
 									? { limit: 50 }
@@ -499,7 +532,10 @@ export const workerHostMachine = setup({
 									id: `${context.bindingGeneration}:${context.surfaceSequence + 1}`,
 									port: event.port,
 									fullscreen: event.fullscreen,
-									library: args.guards.currentReader(args) ? context.library : undefined,
+									library:
+										args.guards.currentReader(args) && context.activeBinding.commands
+											? workspaceLibraryCommands(context.activeBinding.commands)
+											: undefined,
 									documentId: event.documentId,
 									sources: event.sources,
 									deadlineMs: context.input.closePolicy?.surfaceMs ?? REALM_CLOSE_POLICY.surfaceMs,

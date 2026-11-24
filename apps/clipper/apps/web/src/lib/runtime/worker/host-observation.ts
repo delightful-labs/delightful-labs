@@ -2,6 +2,7 @@ import { createCallbackLogic } from 'xstate'
 import type { ActorRefFrom } from 'xstate'
 import {
 	selectLibraryActor,
+	selectLibraryCommandBinding,
 	selectRecoveryBinding
 } from '../../machines/runtime/application-readiness.js'
 import type { ApplicationSnapshot } from '../../machines/runtime/application-readiness.js'
@@ -9,6 +10,7 @@ import type { libraryMachine } from '../../machines/capture/library.js'
 import type { tagFormMachine } from '../../machines/capture/tag-form.js'
 import type { RecoveryBinding } from '../../contracts/account.js'
 import type { RecoveryOwner } from './recovery-owner.js'
+import type { WorkspaceLibraryBinding } from '../../machines/runtime/workspace-library.js'
 
 type Observable = {
 	subscribe(observer: { next: () => void; error: () => void }): { unsubscribe: () => void }
@@ -17,9 +19,14 @@ type Library = ActorRefFrom<typeof libraryMachine>
 export type ApplicationBindingFacts = {
 	library: Library | undefined
 	recovery: RecoveryBinding | undefined
+	commands: WorkspaceLibraryBinding | undefined
 }
 export function applicationBindingFacts(snapshot: ApplicationSnapshot): ApplicationBindingFacts {
-	return { library: selectLibraryActor(snapshot), recovery: selectRecoveryBinding(snapshot) }
+	return {
+		library: selectLibraryActor(snapshot),
+		recovery: selectRecoveryBinding(snapshot),
+		commands: selectLibraryCommandBinding(snapshot)
+	}
 }
 export function sameApplicationBinding(
 	left: ApplicationBindingFacts,
@@ -27,6 +34,8 @@ export function sameApplicationBinding(
 ) {
 	return (
 		left.library === right.library &&
+		left.commands?.owner === right.commands?.owner &&
+		left.commands?.lease === right.commands?.lease &&
 		left.recovery?.capability === right.recovery?.capability &&
 		left.recovery?.source === right.recovery?.source
 	)

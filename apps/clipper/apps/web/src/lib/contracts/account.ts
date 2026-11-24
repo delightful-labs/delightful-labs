@@ -13,6 +13,14 @@ export type RootAccess = Readonly<{
 	read: () => Promise<'compatible' | 'missing' | 'incompatible'>
 	ensure: () => RootWrite
 }>
+/** Ongoing local native evidence; bootstrap completion is not an access grant. */
+export type WorkspaceAccess = Readonly<{
+	workspaceId: string
+	subscribe: (
+		publish: (access: 'allowed' | 'unknown' | 'denied') => void,
+		failed: () => void
+	) => () => void
+}>
 export type RecoveryBinding = Readonly<{
 	source: RecoveryScopeSource
 	capability: RecoveryPhraseCapability
@@ -20,6 +28,7 @@ export type RecoveryBinding = Readonly<{
 /** Native binding lifetime; library allocation waits for domain admission. */
 export type AccountCapabilities = Readonly<{
 	root: RootAccess
+	access: WorkspaceAccess
 	recovery: RecoveryBinding
 	createLibrary: (live: () => boolean) => LibraryCapability
 }>
@@ -27,8 +36,7 @@ export type AccountObservation = SessionRuntimeObservation<AccountCapabilities>
 export type ReadyAccountObservation = Extract<AccountObservation, { status: 'ready' }>
 export type AccountBinding = Readonly<{
 	observation: ReadyAccountObservation
-	library: LibraryCapability
-	release: () => void
+	scope: import('delightful-local-first/workspace/contracts').WorkspaceSelectionScope
 }>
 export type AccountInput = Readonly<{
 	session: SessionRuntimeConnection<AccountCapabilities>
@@ -36,5 +44,11 @@ export type AccountInput = Readonly<{
 	signOut?: () => Promise<void>
 }>
 export function sameAccountBinding(left: AccountObservation, right: AccountObservation) {
-	return left.status === 'ready' && right.status === 'ready' && left.binding === right.binding
+	return (
+		left.status === 'ready' &&
+		right.status === 'ready' &&
+		left.binding === right.binding &&
+		left.identityId === right.identityId &&
+		left.capabilities.access.workspaceId === right.capabilities.access.workspaceId
+	)
 }

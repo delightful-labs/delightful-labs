@@ -1,0 +1,9 @@
+{
+	"suite": "startup-owner.test.ts",
+	"property": "preserves settlement across generated completion/shutdown schedules",
+	"seed": 20261124,
+	"path": "0:0:0",
+	"counterexample": [false, false, 1],
+	"cause": "The test report sink collected xstate.init as an initialization result.",
+	"correction": "Admit only WORKSPACE_INITIALIZATION_RESULT in the report sink; retain the original report-count assertions."
+}

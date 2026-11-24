@@ -1,4 +1,11 @@
-import { types, createAsyncLogic, setup, type ActorLogic, type Snapshot } from 'xstate'
+import {
+	matchesState,
+	types,
+	createAsyncLogic,
+	setup,
+	type ActorLogic,
+	type Snapshot
+} from 'xstate'
 
 import type { EventPayload } from '../../contracts/machine-events.js'
 export type InitializationEvent =
@@ -8,20 +15,34 @@ export type InitializationEvent =
 	| {
 			type: 'SHUTDOWN'
 	  }
-export type InitializationRecords = {
-	identities: readonly {
-		id: string
-		initialWorkspaceId?: string | null | undefined
-	}[]
-	workspaces: readonly unknown[]
-	serverConfigured: boolean
-}
+export type InitializationRecords =
+	| {
+			canonicalRoot?: undefined
+			identities: readonly {
+				id: string
+				initialWorkspaceId?: string | null | undefined
+			}[]
+			workspaces: readonly unknown[]
+			serverConfigured: boolean
+	  }
+	| {
+			/** Storage facts for a schema-enforced private root whose ID is the native identity. */
+			canonicalRoot: {
+				id: string
+				status: 'compatible' | 'missing' | 'incompatible'
+			}
+			identities?: never
+			workspaces?: never
+			serverConfigured?: never
+	  }
 export type InitializationOutcome<Persistence> =
 	| Persistence
 	| {
 			outcome: 'ready'
 			identityId: string
 			workspaceId: string
+			/** Exact creation result; absent when opening existing local provenance/root. */
+			persistence?: Persistence
 	  }
 	| {
 			outcome: 'unavailable'
@@ -30,6 +51,7 @@ export type InitializationOutcome<Persistence> =
 				| 'initializationMissing'
 				| 'identityMissing'
 				| 'duplicateIdentities'
+				| 'canonicalRootConflict'
 	  }
 	| {
 			outcome: 'failed'
@@ -38,11 +60,17 @@ export type InitializationOutcome<Persistence> =
 	  }
 	| {
 			outcome: 'closed' | 'cancelled'
-			settlement: 'notStarted'
+			settlement: 'notStarted' | 'locallyPersisted' | 'rejected'
+			persistence?: Persistence
 	  }
-export type BootstrapLogic<Db, Attempt, S extends Snapshot<unknown>> = ActorLogic<
+export type BootstrapLogic<
+	Db,
+	Attempt,
+	S extends Snapshot<unknown>,
+	Events extends { type: string } = InitializationEvent
+> = ActorLogic<
 	S,
-	InitializationEvent,
+	Events | InitializationEvent,
 	{
 		db: Db
 		attempt: Attempt
@@ -56,7 +84,8 @@ export function createWorkspaceInitialization<
 	Persistence extends {
 		outcome: string
 	},
-	S extends Snapshot<Persistence>
+	S extends Snapshot<Persistence>,
+	Events extends { type: string } = InitializationEvent
 >(options: {
 	tiers: {
 		local: Tier
@@ -68,7 +97,11 @@ export function createWorkspaceInitialization<
 		identityId: string
 		workspaceId: string
 	}
-	transaction: BootstrapLogic<Db, Attempt, S>
+	transaction: BootstrapLogic<Db, Attempt, S, Events>
+	/** Only definitive concurrency outcomes permit one authority rediscovery. Never reissue a write. */
+	reconcileBootstrap?: (
+		persistence: NonNullable<S['output']>
+	) => 'notStarted' | 'rejected' | undefined
 }) {
 	type Input = {
 		db: Db
@@ -96,6 +129,9 @@ export function createWorkspaceInitialization<
 		operation: {
 			db: Db
 			attempt: WorkspaceCreationAttempt | undefined
+			target: { identityId: string; workspaceId: string } | undefined
+			persistence: Persistence | undefined
+			reconciliation: 'notStarted' | 'rejected' | undefined
 			result: WorkspaceInitializationResult | undefined
 		}
 	}
@@ -128,25 +164,40 @@ export function createWorkspaceInitialization<
 	const finalizers = {
 		ready: (args) => {
 			const { context } = args
+			const canonical = context.records?.canonicalRoot
+			const target =
+				context.operation.target ??
+				(canonical?.status === 'compatible'
+					? { identityId: canonical.id, workspaceId: canonical.id }
+					: {
+							identityId: required(context.records?.identities?.[0]).id,
+							workspaceId: required(
+								required(context.records?.identities?.[0]).initialWorkspaceId ?? undefined
+							)
+						})
 			return {
 				context: {
 					operation: {
 						...args.context.operation,
 						result: {
 							outcome: 'ready',
-							...(context.operation.attempt !== undefined
-								? options.selectReady(context.operation.attempt)
-								: {
-										identityId: required(context.records?.identities[0]).id,
-										workspaceId: required(
-											required(context.records?.identities[0]).initialWorkspaceId ?? undefined
-										)
-									})
+							...target,
+							...(context.operation.persistence !== undefined
+								? { persistence: context.operation.persistence }
+								: {})
 						}
 					}
 				} satisfies Partial<Context>
 			}
 		},
+		canonicalRootConflict: ({ context }) => ({
+			context: {
+				operation: {
+					...context.operation,
+					result: { outcome: 'unavailable', reason: 'canonicalRootConflict' }
+				}
+			} satisfies Partial<Context>
+		}),
 		duplicateIdentities: (_args) => {
 			return {
 				context: {
@@ -206,7 +257,10 @@ export function createWorkspaceInitialization<
 						..._args.context.operation,
 						result: {
 							outcome: 'cancelled',
-							settlement: 'notStarted'
+							settlement: _args.context.operation.reconciliation ?? 'notStarted',
+							...(_args.context.operation.persistence === undefined
+								? {}
+								: { persistence: _args.context.operation.persistence })
 						}
 					}
 				} satisfies Partial<Context>
@@ -219,7 +273,10 @@ export function createWorkspaceInitialization<
 						..._args.context.operation,
 						result: {
 							outcome: 'closed',
-							settlement: 'notStarted'
+							settlement: _args.context.operation.reconciliation ?? 'notStarted',
+							...(_args.context.operation.persistence === undefined
+								? {}
+								: { persistence: _args.context.operation.persistence })
 						}
 					}
 				} satisfies Partial<Context>
@@ -243,6 +300,9 @@ export function createWorkspaceInitialization<
 			operation: {
 				db: input.db,
 				attempt: undefined,
+				target: undefined,
+				persistence: undefined,
+				reconciliation: undefined,
 				result: undefined
 			}
 		}),
@@ -291,7 +351,22 @@ export function createWorkspaceInitialization<
 			checkingIdentities: {
 				type: 'choice',
 				choice: (args) => {
-					if ((args.context.records?.identities.length ?? 0) > 1) {
+					const records = args.context.records
+					const canonical = records?.canonicalRoot
+					if (canonical) {
+						if (
+							!canonical.id ||
+							canonical.id !== args.context.userId ||
+							records.identities !== undefined ||
+							records.workspaces !== undefined ||
+							records.serverConfigured !== undefined ||
+							canonical.status === 'incompatible'
+						)
+							return { target: 'canonicalRootConflict' }
+						if (canonical.status === 'compatible') return { target: 'ready' }
+						return { target: 'preparingInitial' }
+					}
+					if ((args.context.records?.identities?.length ?? 0) > 1) {
 						return { target: 'duplicateIdentities' }
 					}
 					return { target: 'checkingInitialization' }
@@ -300,7 +375,7 @@ export function createWorkspaceInitialization<
 			checkingInitialization: {
 				type: 'choice',
 				choice: (args) => {
-					if (args.context.records?.identities[0]?.initialWorkspaceId != null) {
+					if (args.context.records?.identities?.[0]?.initialWorkspaceId != null) {
 						return { target: 'ready' }
 					}
 					return { target: 'checkingAuthority' }
@@ -351,18 +426,19 @@ export function createWorkspaceInitialization<
 				type: 'choice',
 				choice: (args) => {
 					const { context } = args
-					if ((context.records?.identities.length ?? 0) > 1) {
+					if (context.records?.canonicalRoot) return { target: 'checkingIdentities' }
+					if ((context.records?.identities?.length ?? 0) > 1) {
 						return { target: 'duplicateIdentities' }
 					}
-					if (context.records?.identities[0]?.initialWorkspaceId != null) {
+					if (context.records?.identities?.[0]?.initialWorkspaceId != null) {
 						return { target: 'ready' }
 					}
-					if (context.records?.identities.length === 1) {
+					if (context.records?.identities?.length === 1) {
 						return {
 							target: 'initializationMissing'
 						}
 					}
-					if ((context.records?.workspaces.length ?? 0) > 0) {
+					if ((context.records?.workspaces?.length ?? 0) > 0) {
 						return { target: 'identityMissing' }
 					}
 					return { target: 'preparingInitial' }
@@ -373,12 +449,20 @@ export function createWorkspaceInitialization<
 					src: prepareInitial,
 					input: ({ context }) => ({ db: context.operation.db, userId: context.userId }),
 					onDone: (args) => {
+						const target = options.selectReady(args.event.output)
+						const canonical = args.context.records?.canonicalRoot
+						if (
+							canonical &&
+							(target.identityId !== canonical.id || target.workspaceId !== canonical.id)
+						)
+							return { target: 'canonicalRootConflict' }
 						return {
 							target: 'bootstrapping',
 							context: {
 								operation: {
 									...args.context.operation,
-									attempt: args.event.output
+									attempt: args.event.output,
+									target
 								}
 							} satisfies Partial<Context>
 						}
@@ -400,13 +484,46 @@ export function createWorkspaceInitialization<
 					}
 				})
 			},
+			reconcilingBootstrap: {
+				invoke: completionModel.createInvoke<typeof discover, Context>({
+					src: discover,
+					input: ({ context }) => ({
+						db: context.operation.db,
+						userId: context.userId,
+						tier: options.tiers.authority
+					}),
+					onDone: ({ context, event }) => {
+						const target = required(context.operation.target)
+						const records = event.output
+						const root = records.canonicalRoot
+						const profile = records.identities?.[0]
+						const matching = root
+							? root.status === 'compatible' &&
+								root.id === target.identityId &&
+								root.id === target.workspaceId
+							: records.identities?.length === 1 &&
+								profile?.id === target.identityId &&
+								profile.initialWorkspaceId === target.workspaceId
+						return { target: matching ? 'ready' : 'completed', context: { records } }
+					},
+					onError: () => ({ target: 'completed' })
+				})
+			},
 			bootstrapping: {
+				initial: 'active',
+				states: {
+					active: {},
+					cancelling: { on: { CANCEL: {} } },
+					closing: { on: { CANCEL: {}, SHUTDOWN: {} } }
+				},
 				on: {
 					CANCEL: (args, enq) => {
 						enq.sendTo('bootstrap', { type: 'CANCEL' })
+						return { target: '.cancelling' }
 					},
 					SHUTDOWN: (args, enq) => {
 						enq.sendTo('bootstrap', { type: 'SHUTDOWN' })
+						return { target: '.closing' }
 					}
 				},
 				invoke: completionModel.createInvoke<typeof options.transaction, Context>({
@@ -420,7 +537,50 @@ export function createWorkspaceInitialization<
 					onDone: (args) => {
 						const { event } = args
 						if (event.output?.outcome === 'succeeded') {
-							return { target: 'ready' }
+							if (
+								matchesState({ bootstrapping: 'closing' }, args.value) ||
+								matchesState({ bootstrapping: 'cancelling' }, args.value)
+							)
+								return {
+									target: 'completed',
+									context: {
+										operation: {
+											...args.context.operation,
+											result: {
+												outcome: matchesState({ bootstrapping: 'closing' }, args.value)
+													? 'closed'
+													: 'cancelled',
+												settlement: 'locallyPersisted',
+												persistence: event.output
+											}
+										}
+									} satisfies Partial<Context>
+								}
+							return {
+								target: 'ready',
+								context: {
+									operation: { ...args.context.operation, persistence: event.output }
+								} satisfies Partial<Context>
+							}
+						}
+						const reconciliation =
+							event.output === undefined ||
+							event.output === null ||
+							!matchesState({ bootstrapping: 'active' }, args.value)
+								? undefined
+								: options.reconcileBootstrap?.(event.output)
+						if (reconciliation !== undefined) {
+							return {
+								target: 'reconcilingBootstrap',
+								context: {
+									operation: {
+										...args.context.operation,
+										reconciliation,
+										persistence: event.output,
+										result: event.output
+									}
+								}
+							}
 						}
 						return {
 							target: 'completed',
@@ -456,6 +616,10 @@ export function createWorkspaceInitialization<
 			duplicateIdentities: {
 				type: 'final',
 				entry: finalizers.duplicateIdentities
+			},
+			canonicalRootConflict: {
+				type: 'final',
+				entry: finalizers.canonicalRootConflict
 			},
 			identityMissing: {
 				type: 'final',

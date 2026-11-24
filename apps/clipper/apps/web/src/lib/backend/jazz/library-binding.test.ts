@@ -5,6 +5,8 @@ import { createLibraryBinding, createLibraryCapture } from './library-binding.js
 import { createLibraryCapability } from './library.js'
 import permissions from './jazz.permissions.json' with { type: 'json' }
 import { app } from './jazz.generated.js'
+import { createActor, toPromise } from 'xstate'
+import { rootBootstrapMachine } from '../../machines/runtime/root-bootstrap.js'
 
 let fixture: PolicyTestApp
 beforeAll(async () => {
@@ -25,6 +27,7 @@ it('reuses native root and library builders without exposing their database', as
 	const binding = createLibraryBinding({
 		db,
 		identityId,
+		workspaceId: identityId,
 		isCurrent: () => current,
 		libraryFactory: createLibraryCapability,
 		cacheNamespace: 'library-binding-test'
@@ -67,4 +70,131 @@ it('refuses capture before dispatch and retires a response after binding replace
 	pending.resolve(response)
 	await expect(result).rejects.toThrow('Account scope expired')
 	expect(cancel).toHaveBeenCalledOnce()
+})
+
+it('observes native local root access independently of bootstrap completion', async () => {
+	const session = {
+		user_id: 'observed-canonical-root',
+		authMode: 'local-first',
+		claims: {}
+	} satisfies PolicyTestSession
+	const db = fixture.as(session)
+	const identityId = fixture.accountFor(session)
+	let current = true
+	const binding = createLibraryBinding({
+		db,
+		identityId,
+		workspaceId: identityId,
+		isCurrent: () => current,
+		libraryFactory: createLibraryCapability,
+		cacheNamespace: 'observed-canonical-root'
+	})
+	const observed: string[] = []
+	const failed = vi.fn()
+	const dispose = binding.access.subscribe((access) => observed.push(access), failed)
+	try {
+		await expect.poll(() => observed.at(-1)).toBe('unknown')
+		// No startup actor reports readiness: the subscription observes the actual local write.
+		const write = binding.root.ensure()
+		await write.local()
+		await expect.poll(() => observed.at(-1)).toBe('allowed')
+		expect(failed).not.toHaveBeenCalled()
+		await write.global()
+	} finally {
+		dispose()
+	}
+	current = false
+	expect(() => binding.access.subscribe(() => {}, failed)).toThrow('Account scope expired')
+	// Releasing an access observer does not close the identity-owned native client.
+	expect(await db.one(app.libraries.where({ id: identityId }))).toMatchObject({
+		ownerId: identityId
+	})
+})
+
+it('keeps explicit workspace targeting separate from the native identity', async () => {
+	const session = {
+		user_id: 'explicit-workspace-target',
+		authMode: 'local-first',
+		claims: {}
+	} satisfies PolicyTestSession
+	const db = fixture.as(session)
+	const identityId = fixture.accountFor(session)
+	await db
+		.upsert(app.libraries, identityId, { ownerId: identityId, bootstrapVersion: '1' })
+		.wait({ tier: 'global' })
+	const workspaceId = crypto.randomUUID()
+	const binding = createLibraryBinding({
+		db,
+		identityId,
+		workspaceId,
+		isCurrent: () => true,
+		libraryFactory: createLibraryCapability,
+		cacheNamespace: 'explicit-workspace-target'
+	})
+	expect(await binding.root.read()).toBe('missing')
+	expect(binding.createLibrary().libraryId).toBe(workspaceId)
+	expect(binding.access.workspaceId).toBe(workspaceId)
+	const observed: string[] = []
+	const failed = vi.fn()
+	const dispose = binding.access.subscribe((access) => observed.push(access), failed)
+	try {
+		await expect.poll(() => observed.at(-1)).toBe('unknown')
+		expect(observed).not.toContain('allowed')
+		expect(failed).not.toHaveBeenCalled()
+	} finally {
+		dispose()
+	}
+	expect(await db.one(app.libraries.where({ id: workspaceId }))).toBeNull()
+})
+
+it('converges concurrent shared initialization on one native canonical root and reopens it without a write', async () => {
+	const session = {
+		user_id: 'concurrent-canonical-root',
+		authMode: 'local-first',
+		claims: {}
+	} satisfies PolicyTestSession
+	const db = fixture.as(session)
+	const identityId = fixture.accountFor(session)
+	const makeBinding = () =>
+		createLibraryBinding({
+			db,
+			identityId,
+			workspaceId: identityId,
+			isCurrent: () => true,
+			libraryFactory: createLibraryCapability,
+			cacheNamespace: 'concurrent-canonical-root'
+		})
+	const owners = Array.from({ length: 4 }, () =>
+		createActor(rootBootstrapMachine, {
+			input: { db: makeBinding().root, userId: identityId }
+		})
+	)
+	try {
+		const results = await Promise.all(owners.map((owner) => toPromise(owner.start())))
+		for (const result of results) {
+			expect(result.outcome).toBe('ready')
+			if (result.outcome === 'ready') {
+				expect(result.workspaceId).toBe(identityId)
+				if (result.persistence?.outcome === 'succeeded') await result.persistence.write.global()
+			}
+		}
+		expect(await db.all(app.libraries.where({ ownerId: identityId }))).toHaveLength(1)
+		const root = makeBinding().root
+		const ensure = vi.fn(() => root.ensure())
+		const reopened = createActor(rootBootstrapMachine, {
+			input: { db: { read: root.read, ensure }, userId: identityId }
+		})
+		try {
+			expect(await toPromise(reopened.start())).toEqual({
+				outcome: 'ready',
+				identityId,
+				workspaceId: identityId
+			})
+			expect(ensure).not.toHaveBeenCalled()
+		} finally {
+			reopened.stop()
+		}
+	} finally {
+		for (const owner of owners) owner.stop()
+	}
 })

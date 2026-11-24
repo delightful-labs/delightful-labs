@@ -1,5 +1,6 @@
 /** Fixed client/identity binding plus a fresh workspace lease generation. */
 export type TransferMutationScope = Readonly<{
+	lease?: import('delightful-local-first/workspace/contracts').WorkspaceLease | undefined
 	binding: object
 	workspaceId: string
 	generation: number
@@ -32,3 +33,18 @@ export type TransferMutationOwnerOutput =
 			scope: TransferMutationScope
 			drain: TransferScopeDrainIdentity | undefined
 	  }>
+
+/** One native operation scope, including the exact admitted workspace activation. */
+export function sameTransferMutationScope(
+	left: TransferMutationScope | undefined,
+	right: TransferMutationScope | undefined
+) {
+	return (
+		left !== undefined &&
+		right !== undefined &&
+		left.binding === right.binding &&
+		left.workspaceId === right.workspaceId &&
+		left.generation === right.generation &&
+		left.lease === right.lease
+	)
+}

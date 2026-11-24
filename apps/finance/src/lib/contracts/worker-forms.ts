@@ -49,6 +49,7 @@ export const workerAccountOrderView = z.strictObject({
 	moves: z.array(z.strictObject({ id: z.uuid(), up: z.boolean(), down: z.boolean() }))
 })
 export type FinanceFormsObservation = {
+	workspaceLease?: import('delightful-local-first/workspace/contracts').WorkspaceLease | undefined
 	sampleSelectedAccounts: readonly string[] | null
 	bank: BankSource
 	transferCreate: InternalTransferEntryObservation

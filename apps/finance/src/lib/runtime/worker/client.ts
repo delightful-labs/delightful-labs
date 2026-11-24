@@ -1,3 +1,4 @@
+import { sameWorkerWorkspaceActivation } from '../../contracts/worker-scope.js'
 import { acceptInspection } from '../../diagnostics/inspector.js'
 import {
 	financeBankConnectRequest,
@@ -744,7 +745,8 @@ export function createFinanceWorkerClient(
 				current.status !== 'ready' ||
 				current.sessionRevision !== scope.sessionRevision ||
 				current.selection.revision !== scope.selection.revision ||
-				current.selection.workspaceId !== scope.selection.workspaceId
+				current.selection.workspaceId !== scope.selection.workspaceId ||
+				!sameWorkerWorkspaceActivation(current.selection, scope.selection)
 			)
 				return
 			if (observedRouteHref !== undefined) {

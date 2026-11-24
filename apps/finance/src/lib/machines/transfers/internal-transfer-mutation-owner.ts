@@ -1,3 +1,4 @@
+import { sameTransferMutationScope } from '../../contracts/transfer-scope-drain.js'
 import type {
 	TransferMutationScope,
 	TransferScopeDrainRequest,
@@ -176,18 +177,8 @@ function retainScopeResult(
 	return current ? { outcome: current.outcome, settlement: current.settlement } : previous
 }
 
-function sameScope(
-	left: TransferMutationScope | undefined,
-	right: TransferMutationScope | undefined
-) {
-	return (
-		left !== undefined &&
-		right !== undefined &&
-		left.binding === right.binding &&
-		left.workspaceId === right.workspaceId &&
-		left.generation === right.generation
-	)
-}
+const sameScope = sameTransferMutationScope
+
 export function createInternalTransferMutationOwner() {
 	const actors = {
 		create: createInternalTransferCreateMachine(),

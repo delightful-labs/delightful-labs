@@ -46,9 +46,10 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 			}: {
 				input: {
 					custody: Custody
+					attempt: Attempt
 				}
 			}) => {
-				const call = transactionCall(input.custody, () => capability.open())
+				const call = transactionCall(input.custody, () => capability.open(input.attempt))
 				input.custody.recordAcquisition(call)
 				return call
 			}
@@ -108,7 +109,11 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 					write: Write
 					custody: Custody
 				}
-			}) => transactionCall(input.custody, () => capability.persistLocal(input.write))
+			}) => transactionCall(input.custody, () => required(capability.persistLocal)(input.write))
+		}),
+		confirmAuthority: createAsyncLogic({
+			run: ({ input }: { input: { write: Write; custody: Custody } }) =>
+				transactionCall(input.custody, () => required(capability.authority).confirm(input.write))
 		}),
 		rollback: createAsyncLogic({
 			run: async ({
@@ -192,7 +197,9 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 	return model.createMachine({
 		id: 'workspace-creation-transaction',
 		context: ({ input }) => ({
-			custody: createTransactionCustody(capability.retainDetached),
+			custody: createTransactionCustody((receipt) =>
+				capability.retainDetached(receipt, input.attempt)
+			),
 			attempt: input.attempt,
 			result: undefined,
 			resources: {
@@ -231,7 +238,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 							opening: {
 								invoke: {
 									src: actors.open,
-									input: ({ context }) => ({ custody: context.custody }),
+									input: ({ context }) => ({ custody: context.custody, attempt: context.attempt }),
 									onDone: (args) => {
 										return {
 											target: 'checkingAfterOpen',
@@ -384,7 +391,7 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 									}),
 									onDone: (args) => {
 										return {
-											target: 'persistingLocal',
+											target: capability.authority ? 'confirmingAuthority' : 'persistingLocal',
 											context: {
 												resources: {
 													...args.context.resources,
@@ -433,6 +440,46 @@ export function createWorkspaceCreationTransaction<Draft, Transaction, Records, 
 												result: fail(args.event.error, true)
 											} satisfies Partial<FullContext>
 										}
+									}
+								}
+							},
+							confirmingAuthority: {
+								invoke: {
+									src: actors.confirmAuthority,
+									input: ({ context }) => ({
+										write: required(context.resources.write),
+										custody: context.custody
+									}),
+									onDone: ({ context }, enq) => {
+										enq(() => clearTransactionCustody(context.custody))
+										return {
+											target: 'finishing',
+											context: {
+												result: {
+													outcome: 'succeeded',
+													settlement: {
+														kind: 'authorityAccepted',
+														workspace: required(context.resources.workspace)
+													}
+												}
+											}
+										}
+									},
+									onError: ({ context, event }, enq) => {
+										if (required(capability.authority).isRejected(event.error)) {
+											enq(() => clearTransactionCustody(context.custody))
+											return {
+												target: 'finishing',
+												context: {
+													result: {
+														outcome: 'failed',
+														error: event.error,
+														settlement: { kind: 'rejected', error: event.error }
+													}
+												}
+											}
+										}
+										return { target: 'rollingBack', context: { result: fail(event.error, true) } }
 									}
 								}
 							},

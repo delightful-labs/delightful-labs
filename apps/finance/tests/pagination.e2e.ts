@@ -312,10 +312,15 @@ test(
 			await expect(page).toHaveURL(
 				(url) => url.searchParams.get('workspace') === fixture.destinationId
 			)
-			await financeFixture(page, 'pagination.e2e:474')
 			await openMenu(page)
-			await expect(dialog.getByRole('status').filter({ hasText: /1 of 25/ })).toBeVisible()
+			await expect(add).toBeDisabled()
+			await expect(dialog.getByRole('status').filter({ hasText: /1 of 25/ })).toHaveCount(0)
+			await expect
+				.poll(() => financeFixture(page, 'pagination.e2e:480', fixture))
+				.toEqual({ source: 1, destination: 0 })
+			await financeFixture(page, 'pagination.e2e:474')
 			await expect(add).toBeEnabled()
+			await expect(dialog.getByRole('status').filter({ hasText: /1 of 25/ })).toHaveCount(0)
 			await expect
 				.poll(() => financeFixture(page, 'pagination.e2e:480', fixture))
 				.toEqual({ source: 1, destination: 0 })

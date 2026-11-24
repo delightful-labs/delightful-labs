@@ -102,7 +102,7 @@ for (const wait of ['open', 'detach', 'replacement'] as const) {
 							previous = view.library.scope
 							this.postMessage({
 								type: 'ACCOUNT',
-								scope: view.scope,
+								scope: view.accountScope,
 								event: { type: 'RESTORE', phrase }
 							})
 						}

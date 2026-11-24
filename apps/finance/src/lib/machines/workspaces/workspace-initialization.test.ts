@@ -35,7 +35,7 @@ describe('workspace initialization decisions', () => {
 		})
 		expect(init.discover).toHaveBeenCalledTimes(2)
 		expect(init.discover.mock.calls[0]?.[1]?.tier).toBe(ReadTier.LocalFirst)
-		expect(f.beginTransaction).not.toHaveBeenCalled()
+		expect(f.beginSerializableTransaction).not.toHaveBeenCalled()
 		expect(f.insert).not.toHaveBeenCalled()
 	})
 	it.each([
@@ -58,7 +58,7 @@ describe('workspace initialization decisions', () => {
 			const done = await waitFor(init.actor.start(), (s) => s.status === 'done')
 			expect(done.output).toEqual({ outcome: 'unavailable', reason: 'initializationMissing' })
 			expect(init.discover).toHaveBeenCalledTimes(4)
-			expect(f.beginTransaction).not.toHaveBeenCalled()
+			expect(f.beginSerializableTransaction).not.toHaveBeenCalled()
 			expect(f.update).not.toHaveBeenCalled()
 			expect(f.insert).not.toHaveBeenCalled()
 		}
@@ -74,7 +74,7 @@ describe('workspace initialization decisions', () => {
 		f.one.mockReset().mockResolvedValue(null)
 		const actor = init.actor.start()
 		await waitFor(actor, (s) => s.matches('awaitingAuthority'))
-		expect(f.beginTransaction).not.toHaveBeenCalled()
+		expect(f.beginSerializableTransaction).not.toHaveBeenCalled()
 		expect(
 			init.discover.mock.calls.slice(2).every((call) => call[1]?.tier === ReadTier.Remote)
 		).toBe(true)
@@ -85,7 +85,8 @@ describe('workspace initialization decisions', () => {
 		expect(done.output).toEqual({
 			outcome: 'ready',
 			identityId: expectedProfileId,
-			workspaceId: expectedWorkspaceId
+			workspaceId: expectedWorkspaceId,
+			persistence: { outcome: 'succeeded', settlement: 'authorityAccepted', workspace }
 		})
 		expect(f.insert).toHaveBeenNthCalledWith(
 			1,
@@ -110,7 +111,7 @@ describe('workspace initialization decisions', () => {
 		init.getConfig.mockReturnValue({})
 		const done = await waitFor(init.actor.start(), (s) => s.status === 'done')
 		expect(done.output).toEqual({ outcome: 'unavailable', reason: 'authorityUnavailable' })
-		expect(f.beginTransaction).not.toHaveBeenCalled()
+		expect(f.beginSerializableTransaction).not.toHaveBeenCalled()
 	})
 	it('uses remote initialization knowledge arriving after an empty local cache', async () => {
 		const f = creationFixture()
@@ -126,7 +127,7 @@ describe('workspace initialization decisions', () => {
 			identityId: profileId,
 			workspaceId: workspace.id
 		})
-		expect(f.beginTransaction).not.toHaveBeenCalled()
+		expect(f.beginSerializableTransaction).not.toHaveBeenCalled()
 	})
 	it.each([
 		{
@@ -147,7 +148,7 @@ describe('workspace initialization decisions', () => {
 				.mockResolvedValueOnce(organizations)
 			const done = await waitFor(init.actor.start(), (s) => s.status === 'done')
 			expect(done.output).toEqual({ outcome: 'unavailable', reason })
-			expect(f.beginTransaction).not.toHaveBeenCalled()
+			expect(f.beginSerializableTransaction).not.toHaveBeenCalled()
 		}
 	)
 	it('does not create after cancellation of an outstanding remote read', async () => {
@@ -164,7 +165,7 @@ describe('workspace initialization decisions', () => {
 		remote.resolve([])
 		const done = await waitFor(actor, (s) => s.status === 'done')
 		expect(done.output).toEqual({ outcome: 'cancelled', settlement: 'notStarted' })
-		expect(f.beginTransaction).not.toHaveBeenCalled()
+		expect(f.beginSerializableTransaction).not.toHaveBeenCalled()
 	})
 	it('drains bootstrap persistence before completing shutdown', async () => {
 		const f = creationFixture()
@@ -183,7 +184,7 @@ describe('workspace initialization decisions', () => {
 		expect(actor.getSnapshot().status).toBe('active')
 		pending.resolve()
 		const done = await waitFor(actor, (s) => s.status === 'done')
-		expect(done.output).toEqual({ outcome: 'closed', settlement: 'locallyPersisted' })
+		expect(done.output).toEqual({ outcome: 'closed', settlement: 'authorityAccepted' })
 		expect(f.rollback).not.toHaveBeenCalled()
 	})
 	it('returns read failures without attempting bootstrap', async () => {
@@ -193,14 +194,14 @@ describe('workspace initialization decisions', () => {
 		init.discover.mockRejectedValue(error)
 		const done = await waitFor(init.actor.start(), (s) => s.status === 'done')
 		expect(done.output).toEqual({ outcome: 'failed', settlement: 'notStarted', error })
-		expect(f.beginTransaction).not.toHaveBeenCalled()
+		expect(f.beginSerializableTransaction).not.toHaveBeenCalled()
 	})
 })
 
 describe('initialization transaction boundaries', () => {
 	it('does not overwrite a profile that appeared before first-time bootstrap', async () => {
 		const f = creationFixture()
-		const done = await waitFor(f.transaction('bootstrap'), (s) => s.status === 'done')
+		const done = await waitFor(f.bootstrapTransaction(), (s) => s.status === 'done')
 		expect(done.output).toEqual({ outcome: 'profileUnavailable', settlement: 'notStarted' })
 		expect(f.insert).not.toHaveBeenCalled()
 		expect(f.rollback).toHaveBeenCalledTimes(1)
@@ -214,7 +215,7 @@ describe('initialization transaction boundaries', () => {
 			.mockImplementationOnce(() => {
 				throw error
 			})
-		const done = await waitFor(f.transaction('bootstrap'), (s) => s.status === 'done')
+		const done = await waitFor(f.bootstrapTransaction(), (s) => s.status === 'done')
 		expect(done.output).toEqual({ outcome: 'failed', settlement: 'notStarted', error })
 		expect(f.insert).toHaveBeenNthCalledWith(
 			1,

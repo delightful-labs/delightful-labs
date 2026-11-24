@@ -10,8 +10,104 @@ import type { LibraryCapability } from '../../contracts/library.js'
 import type { SaveResult } from '../../contracts/storage.js'
 import { createWorkerHostFixture } from './host-machine.test-support.js'
 import { selectApplicationView } from '../../machines/runtime/application-readiness.js'
+import { selectIdentityCommandScope } from './host-machine.js'
+import { recoveryView } from './recovery-owner.js'
+import { commandSchema } from './protocol.js'
 
 const cleanups = new Set<() => void>()
+
+it('keeps an open identity recovery dialog closable through library admission and rejects the scope after identity replacement', async () => {
+	const original = readyAccount('A')
+	let allow: ((access: 'allowed') => void) | undefined
+	let currentAccess: 'allowed' | 'unknown' = 'unknown'
+	const recoveryScope = {
+		kind: 'available',
+		identityId: 'A',
+		binding: {},
+		generation: 0
+	} satisfies import('delightful-local-first/recovery/contracts').AvailableRecoveryScope
+	const native = nativeSessionFixture({
+		...original,
+		capabilities: {
+			...original.capabilities,
+			access: {
+				workspaceId: 'A',
+				subscribe: (publish) => {
+					allow = (value) => {
+						currentAccess = value
+						publish(value)
+					}
+					publish(currentAccess)
+					return () => {}
+				}
+			},
+			recovery: {
+				source: {
+					subscribe: (publish) => {
+						publish(recoveryScope)
+						return () => {}
+					}
+				},
+				capability: {
+					isCurrentScope: (scope) => scope === recoveryScope,
+					readPhrase: async () => 'synthetic recovery phrase'
+				}
+			}
+		}
+	})
+	const f = createWorkerHostFixture(undefined, undefined, undefined, { account: native })
+	try {
+		f.actor.start()
+		await waitFor(f.actor, (snapshot) => !!snapshot.context.recovery, { timeout: 1000 })
+		const first = f.actor.getSnapshot()
+		const identity = selectIdentityCommandScope(first)
+		f.actor.send(
+			commandSchema.parse({ type: 'RECOVERY', scope: identity, event: { type: 'REVEAL' } })
+		)
+		await vi.waitFor(() =>
+			expect(recoveryView(f.actor.getSnapshot().context.recovery).kind).toBe('revealed')
+		)
+		if (!allow) throw new Error('Missing native access observer')
+		allow('allowed')
+		await waitFor(f.actor, (snapshot) => !!snapshot.context.library, { timeout: 1000 })
+		expect(f.actor.getSnapshot().context.scope).not.toBe(first.context.scope)
+		expect(f.actor.getSnapshot().context.recovery).toBe(first.context.recovery)
+		f.actor.send(
+			commandSchema.parse({ type: 'RECOVERY', scope: identity, event: { type: 'HIDE' } })
+		)
+		expect(recoveryView(f.actor.getSnapshot().context.recovery).kind).toBe('hidden')
+		expect(selectIdentityCommandScope(f.actor.getSnapshot())).toBe(identity)
+		f.actor.send(
+			commandSchema.parse({
+				type: 'ACCOUNT',
+				scope: identity,
+				event: { type: 'RESTORE', phrase: 'invalid synthetic phrase' }
+			})
+		)
+		await vi.waitFor(() =>
+			expect(
+				selectApplicationView(f.actor.getSnapshot().children.application?.getSnapshot(), true)
+					.feedback
+			).toBe('restoreInvalid')
+		)
+		await waitFor(f.actor, (snapshot) => !!snapshot.context.library, { timeout: 1000 })
+		expect(selectIdentityCommandScope(f.actor.getSnapshot())).toBe(identity)
+		expect(native.change).not.toHaveBeenCalled()
+		native.emit(readyAccount('B'))
+		await waitFor(
+			f.actor,
+			(snapshot) => !!snapshot.context.library && selectIdentityCommandScope(snapshot) !== identity,
+			{ timeout: 1000 }
+		)
+		f.actor.send({ type: 'RECOVERY', scope: identity, event: { type: 'REVEAL' } })
+		expect(recoveryView(f.actor.getSnapshot().context.recovery).kind).toBe('unavailable')
+		f.actor.send({ type: 'SHUTDOWN' })
+		await waitFor(f.actor, (snapshot) => snapshot.status === 'done', { timeout: 1000 })
+	} finally {
+		f.actor.stop()
+		f.owner.stop()
+	}
+})
 
 it.each(['provider', 'session'] as const)(
 	'retains the %s sign-out effect during overdue feedback and actual realm shutdown',
@@ -41,7 +137,7 @@ it.each(['provider', 'session'] as const)(
 			await waitFor(f.actor, (snapshot) => !!snapshot.context.library, { timeout: 1000 })
 			f.actor.send({
 				type: 'ACCOUNT',
-				scope: f.actor.getSnapshot().context.scope,
+				scope: selectIdentityCommandScope(f.actor.getSnapshot()),
 				event: { type: 'LOGOUT' }
 			})
 			await vi.waitFor(() =>

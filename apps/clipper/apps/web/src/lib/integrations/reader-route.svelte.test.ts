@@ -65,6 +65,7 @@ function fixture() {
 	const initialView = selectLibraryView(undefined)
 	let current: LibraryRender = {
 		scope: crypto.randomUUID(),
+		accountScope: crypto.randomUUID(),
 		rows: [],
 		total: 0,
 		hasMore: false,

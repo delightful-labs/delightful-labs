@@ -52,7 +52,7 @@
 			serverUrl,
 			...(createWorker ? { createWorker } : {}),
 			publish: (next) => {
-				accountScope = next.scope
+				accountScope = next.accountScope
 				view = next.account
 				oauth = next.oauth
 				if (!next.library) {

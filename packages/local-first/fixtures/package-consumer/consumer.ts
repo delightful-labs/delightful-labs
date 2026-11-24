@@ -171,7 +171,16 @@ export { createSingleWriteFormOptions } from 'delightful-local-first/forms/polic
 export { createScopedFormController } from 'delightful-local-first/forms/svelte'
 export { stopAfterShutdown } from 'delightful-local-first/forms/lifecycle'
 export { createWorkspaceInitialization } from 'delightful-local-first/workspace/initialization'
-export { createWorkspaceStartupMachine } from 'delightful-local-first/workspace/startup'
+export {
+	createWorkspaceStartupOwner,
+	createWorkspaceSeedOwner
+} from 'delightful-local-first/workspace/startup'
+export type {
+	WorkspaceInitializationProvenance,
+	WorkspaceInitializationReport,
+	WorkspaceStartupInput,
+	WorkspaceStartupResult
+} from 'delightful-local-first/workspace/startup-contracts'
 export { createWorkspaceJournal } from 'delightful-local-first/workspace/journal'
 export { createWorkspaceCreationOwner } from 'delightful-local-first/workspace/creation-owner'
 export { createWorkspaceCreationOperation } from 'delightful-local-first/workspace/creation-operation'

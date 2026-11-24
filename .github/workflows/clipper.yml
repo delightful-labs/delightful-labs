@@ -102,6 +102,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --workspace-root monorepo:check-links
       - run: pnpm test:e2e
+      - name: Preserve web browser failures
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: clipper-web-browser-failures
+          path: apps/clipper/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
 
   worker-offline:
     needs: plan

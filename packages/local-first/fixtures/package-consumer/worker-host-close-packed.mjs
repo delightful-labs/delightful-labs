@@ -3,9 +3,40 @@ import { createRequire } from 'node:module'
 import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { Worker } from 'node:worker_threads'
 import { build } from 'vite'
 
 const consumers = [
+	{
+		name: 'workspace-authority-transaction',
+		source: 'workspace-authority-transaction.ts',
+		subpath: 'delightful-local-first/workspace/creation/workflow'
+	},
+	{
+		name: 'workspace-resource',
+		source: 'workspace-resource.ts',
+		subpath: 'delightful-local-first/workspace/resource'
+	},
+	{
+		name: 'bound-observation',
+		source: 'bound-observation.ts',
+		subpath: 'delightful-local-first/data/observation-workflow'
+	},
+	{
+		name: 'workspace-initialization',
+		source: 'workspace-initialization.ts',
+		subpath: 'delightful-local-first/workspace/initialization'
+	},
+	{
+		name: 'workspace-startup',
+		source: 'workspace-startup.ts',
+		subpath: 'delightful-local-first/workspace/startup'
+	},
+	{
+		name: 'workspace-seed',
+		source: 'workspace-seed.ts',
+		subpath: 'delightful-local-first/workspace/startup'
+	},
 	{
 		name: 'browser-job',
 		source: 'browser-worker-job.ts',
@@ -70,7 +101,7 @@ try {
 	execFileSync(
 		process.execPath,
 		[resolve('node_modules/typescript/bin/tsc'), '--project', join(directory, 'tsconfig.json')],
-		{ stdio: 'pipe' }
+		{ stdio: 'inherit' }
 	)
 	const { workerBuild } = await import(pathToFileURL(buildConsumer).href)
 	for (const consumer of consumers) {
@@ -82,6 +113,19 @@ try {
 			['--experimental-strip-types', join(directory, 'consumer-' + consumer.name + '.ts')],
 			{ stdio: 'pipe' }
 		)
+		await new Promise((resolve, reject) => {
+			const worker = new Worker(
+				pathToFileURL(join(directory, 'consumer-' + consumer.name + '.ts')),
+				{
+					execArgv: ['--experimental-strip-types']
+				}
+			)
+			worker.once('error', reject)
+			worker.once('exit', (code) => {
+				if (code === 0) resolve(undefined)
+				else reject(new Error(`Packed ${consumer.name} worker exited with code ${code}`))
+			})
+		})
 		const driver = join(directory, 'driver-' + consumer.name + '.ts')
 		await writeFile(
 			driver,
@@ -117,7 +161,7 @@ try {
 		})
 	}
 	console.log(
-		'Packed browser-job/callback-custody/close/root-broker/owned-broker consumers: public types, native effects/receipts and self-contained ES-module workers passed.'
+		'Packed workspace-authority-transaction/workspace-resource/bound-observation/workspace-initialization/workspace-startup/workspace-seed/browser-job/callback-custody/close/root-broker/owned-broker consumers: public types, Node and native ES-module worker execution, effects/receipts and self-contained worker builds passed.'
 	)
 } finally {
 	await rm(directory, { recursive: true, force: true })

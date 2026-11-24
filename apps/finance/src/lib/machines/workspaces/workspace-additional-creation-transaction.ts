@@ -14,7 +14,7 @@ import { workspaceCreationAttemptSchema } from '../../validation/identity.js'
 import type {
 	WorkspacePersistenceEvent,
 	WorkspacePersistenceResult
-} from './workspace-creation-transaction.js'
+} from './workspace-creation-contracts.js'
 import { setup, types } from 'xstate'
 import type { EventPayload } from '../../contracts/event-payload.js'
 
@@ -83,9 +83,23 @@ function domainResult(
 			outcome: result.reason === 'profileUnavailable' ? 'profileUnavailable' : 'conflict',
 			settlement: 'notStarted'
 		}
+	// This adapter uses local mode; project the wider shared receipt union into
+	// its existing durable or definitively unpersisted domain outcomes.
 	if (result.outcome === 'failed')
-		return { outcome: 'failed', settlement: result.settlement.kind, error: result.error }
-	return { outcome: result.outcome, settlement: result.settlement.kind }
+		return {
+			outcome: 'failed',
+			settlement: result.settlement.kind === 'rejected' ? 'notStarted' : result.settlement.kind,
+			error: result.error
+		}
+	return {
+		outcome: result.outcome,
+		settlement:
+			result.settlement.kind === 'authorityAccepted'
+				? 'locallyPersisted'
+				: result.settlement.kind === 'rejected'
+					? 'notStarted'
+					: result.settlement.kind
+	}
 }
 
 /** Bind once per creation owner. Finance retains schemas/journals; the library owns resource lifetime. */

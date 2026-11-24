@@ -12,7 +12,9 @@
 		view: FinanceWorkerView
 		onsend: (command: WorkerFormCommand, scope: WorkerCommandScope) => void
 	} = $props()
-	const scopeKey = $derived(`${view.sessionRevision}:${view.selection.revision}`)
+	const scopeKey = $derived(
+		`${view.sessionRevision}:${view.selection.workspaceId}:${view.selection.activation?.attachment}:${view.selection.activation?.epoch}`
+	)
 	const currency = $derived(
 		view.workspaces?.find((row) => row.id === view.selection.workspaceId)?.defaultCurrency ?? 'USD'
 	)

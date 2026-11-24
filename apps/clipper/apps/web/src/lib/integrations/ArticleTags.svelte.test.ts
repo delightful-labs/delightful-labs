@@ -51,6 +51,7 @@ function fixture(options: { error?: string; selected?: string; enabled?: boolean
 	}
 	let view: LibraryRender = {
 		scope: crypto.randomUUID(),
+		accountScope: crypto.randomUUID(),
 		rows: [row],
 		total: 1,
 		hasMore: false,

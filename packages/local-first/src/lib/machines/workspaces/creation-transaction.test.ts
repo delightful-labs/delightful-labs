@@ -39,7 +39,7 @@ function deferred<Value>() {
 	})
 	return { promise, resolve, reject }
 }
-function fixture() {
+function fixture(authority?: NonNullable<Capability['authority']>) {
 	const attempt: WorkspaceCreationAttempt<Draft> = {
 		operationId: 'operation',
 		workspaceId: 'workspace',
@@ -57,11 +57,14 @@ function fixture() {
 		assess: vi.fn<Capability['assess']>(() => ({ outcome: 'eligible' })),
 		stage: vi.fn<Capability['stage']>(() => workspace),
 		commit: vi.fn<Capability['commit']>(() => write),
-		persistLocal: vi.fn<Capability['persistLocal']>(() => undefined),
+		persistLocal: vi.fn<NonNullable<Capability['persistLocal']>>(() => undefined),
 		rollback: vi.fn<Capability['rollback']>(() => true)
 	}
+	const { persistLocal, ...common } = capability
 	const actor = createActor(
-		createWorkspaceCreationTransaction<Draft, Transaction, Records, Workspace, Write>(capability),
+		createWorkspaceCreationTransaction<Draft, Transaction, Records, Workspace, Write>(
+			authority ? { ...common, authority } : { ...common, persistLocal }
+		),
 		{
 			input: { attempt }
 		}
@@ -82,6 +85,50 @@ function fixture() {
 }
 
 describe('private workspace creation transaction ownership', () => {
+	it('waits for actual authority confirmation and retains shutdown until that receipt', async () => {
+		const receipt = deferred<void>()
+		const confirm = vi.fn(() => receipt.promise)
+		const f = fixture({ confirm, isRejected: () => false })
+		f.start()
+		await vi.waitFor(() => expect(confirm).toHaveBeenCalledWith(f.write))
+		f.actor.send({ type: 'SHUTDOWN' })
+		expect(f.actor.getSnapshot().status).toBe('active')
+		expect(f.capability.persistLocal).not.toHaveBeenCalled()
+		receipt.resolve()
+		expect(await f.done()).toEqual({
+			attempt: f.attempt,
+			outcome: 'closed',
+			settlement: { kind: 'authorityAccepted', workspace: f.workspace }
+		})
+		expect(f.capability.retainDetached).not.toHaveBeenCalled()
+		expect(f.capability.rollback).not.toHaveBeenCalled()
+	})
+	it('relinquishes custody only for an explicitly observed authority rejection', async () => {
+		const rejection = new Error('Definitive authority rejection')
+		const f = fixture({
+			confirm: () => Promise.reject(rejection),
+			isRejected: (error) => error === rejection
+		})
+		f.start()
+		expect(await f.done()).toEqual({
+			attempt: f.attempt,
+			outcome: 'failed',
+			error: rejection,
+			settlement: { kind: 'rejected', error: rejection }
+		})
+		expect(f.capability.rollback).not.toHaveBeenCalled()
+		expect(f.capability.retainDetached).not.toHaveBeenCalled()
+	})
+	it('retains unresolved custody when authority confirmation fails without a rejection receipt', async () => {
+		const failure = new Error('Confirmation transport failed')
+		const f = fixture({ confirm: () => Promise.reject(failure), isRejected: () => false })
+		f.start()
+		expect(await f.done()).toMatchObject({
+			outcome: 'failed',
+			settlement: { kind: 'unresolved', error: failure }
+		})
+		expect(f.capability.retainDetached).toHaveBeenCalledOnce()
+	})
 	it('keeps one transaction and attempt through local eligibility, staging, commit and persistence', async () => {
 		const f = fixture()
 		f.start()

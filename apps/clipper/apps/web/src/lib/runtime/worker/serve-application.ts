@@ -14,7 +14,7 @@ import { projectRuntime } from './views.js'
 import { commandSchema } from './protocol.js'
 import { recoveryView } from './recovery-owner.js'
 import { machineDiagnostics } from '../../diagnostics/inspect.js'
-import { workerHostMachine } from './host-machine.js'
+import { workerHostMachine, selectIdentityCommandScope } from './host-machine.js'
 import type { WorkerHost } from './host-machine.js'
 import { createScopedWorkerAccountStore } from './scoped-account-store.js'
 import { accountStorageKey } from './storage-channel.js'
@@ -152,7 +152,7 @@ export function serveApplicationWorker(options: {
 			const recovery = actor.getSnapshot().context.recovery
 			self.postMessage({
 				type: 'RECOVERY',
-				scope: actor.getSnapshot().context.scope,
+				scope: selectIdentityCommandScope(actor.getSnapshot()),
 				available: !!recovery,
 				view: recoveryView(recovery)
 			})

@@ -21,11 +21,17 @@ function nativeAccount(config: JazzClientConfig, libraryFactory: LibraryFactory)
 				const domain = createLibraryBinding({
 					db,
 					identityId,
+					workspaceId: identityId,
 					isCurrent,
 					libraryFactory,
 					cacheNamespace
 				})
-				return { root: domain.root, recovery, createLibrary: domain.createLibrary }
+				return {
+					root: domain.root,
+					access: domain.access,
+					recovery,
+					createLibrary: domain.createLibrary
+				}
 			}
 		),
 		parsePhrase: parseJazzRecoveryPhrase,

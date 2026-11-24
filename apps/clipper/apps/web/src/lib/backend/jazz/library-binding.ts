@@ -1,6 +1,6 @@
 import { ReadTier } from 'jazz-tools'
 import type { JazzClient } from 'jazz-tools/client'
-import type { RootAccess } from '../../contracts/account.js'
+import type { RootAccess, WorkspaceAccess } from '../../contracts/account.js'
 import type { createLibraryCapability } from './library.js'
 import { createLibraryRecords } from './records.js'
 import { readConnection } from './read-connection.js'
@@ -11,12 +11,13 @@ export function createLibraryBinding(
 	input: Readonly<{
 		db: JazzClient['db']
 		identityId: string
+		workspaceId: string
 		isCurrent: () => boolean
 		libraryFactory: typeof createLibraryCapability
 		cacheNamespace: string
 	}>
 ) {
-	const { db, identityId } = input
+	const { db, identityId, workspaceId } = input
 	const isCurrent = () => {
 		try {
 			return input.isCurrent()
@@ -30,17 +31,19 @@ export function createLibraryBinding(
 	const root: RootAccess = {
 		read: async () => {
 			admitted()
-			const row = await db.one(app.libraries.where({ id: identityId }), {
+			const row = await db.one(app.libraries.where({ id: workspaceId }), {
 				tier: ReadTier.LocalFirst
 			})
 			if (!row) return 'missing'
-			return row.ownerId === identityId && row.bootstrapVersion === '1'
+			return workspaceId === identityId &&
+				row.ownerId === identityId &&
+				row.bootstrapVersion === '1'
 				? 'compatible'
 				: 'incompatible'
 		},
 		ensure: () => {
 			admitted()
-			const write = db.upsert(app.libraries, identityId, {
+			const write = db.upsert(app.libraries, workspaceId, {
 				ownerId: identityId,
 				bootstrapVersion: '1'
 			})
@@ -50,19 +53,45 @@ export function createLibraryBinding(
 			}
 		}
 	}
+	const access: WorkspaceAccess = {
+		workspaceId,
+		subscribe: (publish, failed) => {
+			admitted()
+			return db.subscribe(
+				app.libraries.where({ id: workspaceId }),
+				{
+					onUpdate: (rows) => {
+						const row = rows[0]
+						publish(
+							!isCurrent() || !row
+								? 'unknown'
+								: workspaceId === identityId &&
+									  row.ownerId === identityId &&
+									  row.bootstrapVersion === '1'
+									? 'allowed'
+									: 'denied'
+						)
+					},
+					onError: failed
+				},
+				{ tier: ReadTier.LocalFirst }
+			)
+		}
+	}
 	const createRecords = (live: () => boolean = () => true) => {
 		admitted()
-		return createLibraryRecords(db, identityId, () => isCurrent() && live(), readConnection(db))
+		return createLibraryRecords(db, workspaceId, () => isCurrent() && live(), readConnection(db))
 	}
 	return {
 		root,
+		access,
 		createRecords,
 		capture: createLibraryCapture(db, isCurrent),
 		createLibrary: (live: () => boolean = () => true) => {
 			admitted()
 			return input.libraryFactory(
 				createRecords(live),
-				identityId,
+				workspaceId,
 				createLibraryCapture(db, () => isCurrent() && live()),
 				input.cacheNamespace
 			)

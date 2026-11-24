@@ -194,6 +194,14 @@
 			"types": "./dist/machines/workspaces/selection.d.ts",
 			"default": "./dist/machines/workspaces/selection.js"
 		},
+		"./workspace/resource": {
+			"types": "./dist/machines/workspaces/resource-owner.d.ts",
+			"default": "./dist/machines/workspaces/resource-owner.js"
+		},
+		"./workspace/resource-contracts": {
+			"types": "./dist/contracts/workspace-resource.d.ts",
+			"default": "./dist/contracts/workspace-resource.js"
+		},
 		"./workspace/creation/contracts": {
 			"types": "./dist/contracts/workspace-creation.d.ts",
 			"default": "./dist/contracts/workspace-creation.js"
@@ -306,6 +314,10 @@
 		"./data/observations": {
 			"types": "./dist/contracts/observation.d.ts",
 			"default": "./dist/contracts/observation.js"
+		},
+		"./data/observation-workflow": {
+			"types": "./dist/machines/data/observation.d.ts",
+			"default": "./dist/machines/data/observation.js"
 		},
 		"./backend/jazz/data": {
 			"types": "./dist/backend/jazz/data.svelte.d.ts",

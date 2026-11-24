@@ -1,7 +1,19 @@
 # Shared workspace contracts for Clipper and Finance
 
+For the refreshed production source inventory and extraction order, see
+[implementation inventory](implementation-inventory.md), based on fetched
+`origin/main` at `e7b8f5e7`. The source paths and SDK observations below describe
+the older research baseline; the inventory supersedes them where code changed.
+
 Research baseline: monorepo `f1c22d47`, 2026-11-14. This is a proposed design,
 not an approved implementation or a claim of native SDK qualification.
+
+Architecture direction updated 2026-11-23: the user requires most workspace
+logic to use the same implementation in both apps. Finance's existing workflow
+is the baseline for extraction into Local First. The original research below
+remains a source inventory and design proposal; any suggestion that sharing
+orchestration is optional is superseded by this requirement. App-specific
+schemas and domain policies remain integration boundaries.
 
 Local First should own workspace lifecycle for every app. Clipper should silently
 initialize and select one private workspace, with its existing library as the
@@ -20,7 +32,7 @@ Paths below are relative to the monorepo root.
 | Headless selection, access changes, invalidation and drain requests | `packages/local-first/src/lib/contracts/workspace-selection.ts` and `machines/workspaces/selection.ts` | Reuse existing public `workspace/contracts` and `workspace/workflow`. No new selector machine. |
 | Atomic creation and local durability | `packages/local-first/src/lib/contracts/workspace-creation.ts` and `machines/workspaces/creation-transaction.ts` | Reuse typed transaction ownership and receipt custody; apps supply checks and writes. |
 | Durable explicit creation and reconciliation | Public `workspace/journal`, `workspace/creation-operation`, `workspace/creation-persistence`, `workspace/creation-owner` | Available for explicit operations; do not make Clipper adopt a visible creation flow or a second intake journal. |
-| Replacement of fixed-scope selection actors | `apps/finance/src/lib/machines/runtime/workspace-selection-attachment.ts` | Candidate shared extraction after contract review, with no routing or domain resource ownership. |
+| Replacement of fixed-scope selection actors | `apps/finance/src/lib/machines/runtime/workspace-selection-attachment.ts` | Extract reusable attachment/replacement ownership into Local First for both apps after contract review; retain app routing and domain resource ownership. |
 | Access observation | `apps/finance/src/lib/machines/runtime/workspace-selection-observation.ts` | Keep membership and route projection app-owned. Share observation vocabulary, not Finance's membership interpretation. |
 | Resource drain | `apps/finance/src/lib/machines/runtime/workspace-selection-drain.ts` | Keep financial transfer/resource composition in Finance. Clipper supplies its own resource drain. |
 
@@ -101,9 +113,10 @@ selection machine. It never chooses the first directory entry, creates another
 workspace because a read is empty, or treats a prior selected ID as access proof.
 
 Finance keeps URL/user selection and its existing membership-backed access
-projection. Both consumers use the same lease lifecycle. A shared target resolver
-is warranted only if both apps need the same precedence rules; a generic routing
-framework is unnecessary.
+projection. Both consumers use the same selection and lease lifecycle. Apps
+supply target inputs and access evidence; common target resolution sequencing
+belongs in Local First. Clipper's automatic initial target must not introduce
+a parallel selection owner. A generic routing framework is unnecessary.
 
 Clipper's library can initially be the workspace root, avoiding a second table
 with the same lifetime and cardinality. Most content already carries `libraryId`.
@@ -186,17 +199,28 @@ merely because the underlying model now supports them.
 
 ## Proposed implementation sequence and acceptance
 
-1. Resolve bootstrap admission against installed SDK APIs and decide existing-data
-   treatment. Model initialization states and persistence ownership before code.
+1. Inventory Finance's current initialization, startup, selection, attachment,
+   access observation, creation, transaction and drain responsibilities against
+   Local First exports. Map Clipper equivalents and planned deletions. For each
+   responsibility, record the shared owner or a concrete app/domain reason to
+   retain it. Resolve bootstrap admission against installed SDK APIs and decide
+   existing-data treatment. Model ownership before code; new common bootstrap
+   behavior must serve both apps.
 2. Extend DLF startup/initialization contracts with neutral provenance reporting
    and the selected safe bootstrap admission. Keep Finance's authority behavior
    unchanged unless separately justified.
-3. Extract only the domain-free selection attachment lifecycle if both consumers
-   need it. Reuse the existing selection/lease/transaction exports directly.
+3. Extract Finance's remaining reusable workspace orchestration into Local First,
+   including selection attachment/replacement. Have Finance consume each
+   extraction and remove its replaced implementation. Reuse existing
+   selection/lease/transaction exports directly; avoid a second orchestration
+   layer when the existing shared owner can be extended.
 4. Adopt hidden workspace binding in Clipper web and extension, including policies
    and all record construction paths. No workspace selector is required.
-5. Consolidate any newly demonstrated common behavior back into DLF, retaining
-   Finance's schemas, routes, access projection and financial drains.
+5. Review both consumers against the responsibility inventory and remove replaced
+   Clipper orchestration. Most lifecycle logic must now have one Local First
+   owner used by both apps. Retain Finance's schemas, routes, access policy and
+   financial drains and Clipper's corresponding domain bindings. Explain each
+   remaining lifecycle difference; interface similarity alone is insufficient.
 
 After implementation review, acceptance should cover a fresh offline launch;
 offline cold reopen; restored identity with an empty replica; local data usable
@@ -206,3 +230,10 @@ web/extension convergence; and denied cross-workspace child references. Qualify
 library exports and packed consumers, both production worker bundles, and actual
 backend/native storage behavior. Source inspection alone does not establish
 these runtime guarantees.
+
+
+The fixed-scope attachment candidate above is historical. Production Finance now
+uses the shared `workspace/resource` owner around `worker-workspace-resources.ts`,
+with native identity/access outside it; its unused attachment wrapper and test
+were removed after native qualification. See the implementation inventory and
+selection integration record for the current boundaries and remaining work.

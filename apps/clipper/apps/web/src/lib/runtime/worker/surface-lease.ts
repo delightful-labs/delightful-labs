@@ -15,7 +15,7 @@ type Input = {
 	id: string
 	port: MessagePort
 	fullscreen: { supported: boolean; active: boolean }
-	library: ActorRef<Snapshot<unknown>, LibraryEvent> | undefined
+	library: Pick<ActorRef<Snapshot<unknown>, LibraryEvent>, 'send'> | undefined
 	documentId: string
 	sources: string[]
 	deadlineMs: number
@@ -83,7 +83,7 @@ export const readerSurfaceLeaseMachine = setup({
 		offering: {
 			entry: ({ context }, enq) => {
 				if (!context.input.library) throw new Error('Library unavailable')
-				enq.sendTo(context.input.library, {
+				enq(context.input.library.send, {
 					type: 'READER_EVENT',
 					event: {
 						type: 'ATTACH_SURFACE',

@@ -9,7 +9,7 @@ import {
 } from './workspace-creation-journal.js'
 import { workspaceCreationReconciliation } from './workspace-creation-reconciliation.js'
 import { createWorkspacePersistence } from './workspace-creation-persistence.js'
-import type { WorkspacePersistenceResult } from './workspace-creation-transaction.js'
+import type { WorkspacePersistenceResult } from './workspace-creation-contracts.js'
 import type { SnapshotFrom } from 'xstate'
 
 export type CreationBinding = { key: string; userId: string; profileId: string }

@@ -7,7 +7,11 @@ export default defineConfig({
 	fullyParallel: false,
 	workers: 1,
 	timeout: 45000,
-	use: { baseURL: 'http://127.0.0.1:5180', trace: 'off', screenshot: 'off' },
+	use: {
+		baseURL: 'http://127.0.0.1:5180',
+		trace: process.env.CI ? 'retain-on-failure' : 'off',
+		screenshot: 'off'
+	},
 	webServer: {
 		command: 'pnpm --filter @delightful-clipper/web dev --port 5180',
 		url: 'http://127.0.0.1:5180',

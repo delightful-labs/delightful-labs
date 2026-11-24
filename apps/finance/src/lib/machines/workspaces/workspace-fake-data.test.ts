@@ -53,4 +53,45 @@ it('returns child failure without disguising it as initialized', async () => {
 	})
 })
 
+it('keeps the shared worker seed owner idle until initialization and honors disabled seed policy', async () => {
+	vi.stubEnv('PUBLIC_FAKE_DATA', 'false')
+	const { workerWorkspaceSeed } = await import('./workspace-fake-data.js')
+	const f = seedFixture()
+	const actor = createActor(workerWorkspaceSeed, {
+		input: { db: f.input.db, userId: f.input.userId }
+	}).start()
+	try {
+		expect(f.all).not.toHaveBeenCalled()
+		actor.send({ type: 'INITIALIZED', workspaceId: f.input.organizationId })
+		expect(await toPromise(actor)).toEqual({ outcome: 'closed' })
+		expect(f.all).not.toHaveBeenCalled()
+		expect(f.insert).not.toHaveBeenCalled()
+	} finally {
+		actor.stop()
+	}
+})
+
+it('maps the workspace into Finance seeding and retains its commit receipt until confirmation', async () => {
+	vi.stubEnv('PUBLIC_FAKE_DATA', 'true')
+	const { workerWorkspaceSeed } = await import('./workspace-fake-data.js')
+	const f = seedFixture()
+	const confirmation = Promise.withResolvers<void>()
+	f.wait.mockReturnValue(confirmation.promise)
+	const actor = createActor(workerWorkspaceSeed, {
+		input: { db: f.input.db, userId: f.input.userId }
+	}).start()
+	try {
+		actor.send({ type: 'INITIALIZED', workspaceId: f.input.organizationId })
+		await vi.waitFor(() => expect(f.wait).toHaveBeenCalledOnce())
+		expect(f.insert).toHaveBeenCalledTimes(123)
+		actor.send({ type: 'SHUTDOWN' })
+		expect(actor.getSnapshot().status).toBe('active')
+		confirmation.resolve()
+		expect(await toPromise(actor)).toEqual({ outcome: 'closed' })
+	} finally {
+		confirmation.resolve()
+		actor.stop()
+	}
+})
+
 afterEach(() => vi.unstubAllEnvs())

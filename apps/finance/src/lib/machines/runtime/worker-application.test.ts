@@ -1,6 +1,15 @@
 import type { Db } from 'jazz-tools'
 import { createAccountDeleteGrantMachine } from '../accounts/account-delete-grants.js'
 import { createWorkspaceBackupMachine } from '../workspaces/workspace-backup.js'
+import { prepareBackupSubmission, takeBackupProtection } from '../../backup/submission.js'
+import {
+	prepareWorkspaceRestoreFile,
+	workspaceRestoreFileAvailable
+} from '../workspaces/workspace-restore.js'
+import type {
+	TransferMutationRequest,
+	TransferMutationResponse
+} from '../transfers/internal-transfer-mutation-owner.js'
 import { createWorkspaceRestoreController } from '../workspaces/workspace-restore.js'
 import { createProfileFormOptions } from '../identity/profile.js'
 import { createWorkspaceRenameFormOptions } from '../workspaces/workspace-rename.js'
@@ -27,6 +36,8 @@ import {
 	selectFinanceRestorationAdmission,
 	selectFinanceNavigationRetry,
 	selectFinanceRecoveryReader,
+	selectFinanceBackupAdmission,
+	selectFinanceBankAdmission,
 	selectFinanceFormObservations
 } from './worker-application.js'
 import type {
@@ -41,10 +52,25 @@ import { creationFixture as workspaceCreationFixture } from '../workspaces/works
 import type { InputFrom } from 'xstate'
 import type { workspaceInitialization } from '../workspaces/workspace-initialization.js'
 import { creationFixture } from '../transactions/transaction-create.fixture.js'
-import { createFinanceFormsMachine } from './worker-forms.js'
+import {
+	createFinanceFormsMachine,
+	createFinanceFormGroups,
+	selectFinanceFormsView,
+	selectFinanceFormsLease,
+	type FinanceFormsDependencies
+} from './worker-forms.js'
 import { app } from '../../queries.js'
+import {
+	createFinanceWorkspaceResources,
+	selectFinanceWorkspaceResources,
+	type FinanceResourceObservation
+} from './worker-workspace-resources.js'
 import type { WorkerFormCommand } from '../../contracts/worker-forms.js'
 import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
+import {
+	financeWorkspaceAccessMachine,
+	selectFinanceWorkspaceAccessFacts
+} from './worker-workspace-access.js'
 
 beforeEach(() => {
 	const events = new EventTarget()
@@ -120,6 +146,9 @@ function fixture(
 		release: ReturnType<typeof vi.fn>
 	}[] = []
 	const recoveryRead = vi.fn(async () => 'fixture phrase')
+	const saveProfileName = vi.fn<Parameters<typeof createProfileFormOptions>[0]['saveName']>(
+		async () => {}
+	)
 	const navigate = vi.fn<WorkspaceNavigate>(async () => {})
 	const archiveWrite = vi.fn(async (_accountId: string) => {})
 	const createCategoryWrite = vi.fn<
@@ -284,6 +313,11 @@ function fixture(
 		readRecoveryPhrase: recoveryRead,
 		archiveAccount: archiveWrite
 	}
+	let capturedForms: FinanceFormsDependencies | undefined
+	const buildForms = (dependencies: FinanceFormsDependencies) => {
+		capturedForms = dependencies
+		return createFinanceFormsMachine(dependencies)
+	}
 	const ready = (
 		binding: object
 	): Extract<SessionRuntimeObservation<FinanceWorkerCapabilities>, { status: 'ready' }> => ({
@@ -294,8 +328,20 @@ function fixture(
 		localFirst: true,
 		capabilities: {
 			...capabilities,
-			createForms: (observe, _archive, navigate, accountOrderStorage, transferDispatch) =>
-				createFinanceFormsMachine({
+			createForms: (
+				observe,
+				_archive,
+				navigate,
+				accountOrderStorage,
+				transferDispatch,
+				_routeObserved,
+				contentObserved,
+				reportDisposalFailure
+			) =>
+				buildForms({
+					content: capabilities,
+					contentObserved,
+					reportDisposalFailure,
 					transferDispatch,
 					creationKey: JSON.stringify(['unit', userId]),
 					accountAccess: createAccountDeleteGrantMachine(
@@ -313,7 +359,7 @@ function fixture(
 					profile: createProfileFormOptions({
 						binding,
 						observe: () => observe().profile,
-						saveName: vi.fn(async () => {}),
+						saveName: saveProfileName,
 						saveAvatar: vi.fn(async () => {})
 					}),
 					workspace: createWorkspaceRenameFormOptions({
@@ -344,7 +390,13 @@ function fixture(
 					navigation: createWorkspaceNavigationMachine({ one: async () => null }, navigate),
 					db: formDb,
 					initialization: {
-						db: initialization ?? { ...transactionDb.db, getConfig: () => ({ serverUrl: '' }) },
+						db: initialization ?? {
+							...transactionDb.db,
+							beginSerializableTransaction: () => {
+								throw new Error('Unconfigured initialization must not bootstrap')
+							},
+							getConfig: () => ({ serverUrl: '' })
+						},
 						userId
 					}
 				})
@@ -430,8 +482,10 @@ function fixture(
 		archiveTagWrite,
 		navigate,
 		recoveryRead,
+		saveProfileName,
 		createWrite,
 		transactionDb,
+		formDatabase: formDb,
 		enter: (command: WorkerFormCommand, scope = selectFinanceWorkerView(actor.getSnapshot())) =>
 			actor.send({
 				type: 'TRANSACTION_ENTRY',
@@ -452,6 +506,10 @@ function fixture(
 				selection: scope.selection,
 				sessionRevision: scope.sessionRevision
 			}),
+		financialGroup: () => {
+			if (!capturedForms) throw new Error('Missing fixture form producer')
+			return createFinanceFormGroups(capturedForms).financial
+		},
 		start,
 		select,
 		ready,
@@ -469,6 +527,207 @@ function last<T>(rows: T[]): T {
 	if (!value) throw new Error('Missing test observation')
 	return value
 }
+
+describe('Finance access observations composed through DLF', () => {
+	function accessFixture(fault?: { source: string; stage: 'construction' | 'disposal' }) {
+		const native = fixture()
+		const subscriptions: {
+			source: string
+			emit: () => void
+			failed: () => void
+			release: ReturnType<typeof vi.fn>
+		}[] = []
+		function subscribe(source: string, emit: () => void, failed: () => void) {
+			if (fault?.source === source && fault.stage === 'construction')
+				throw new Error('Cannot subscribe')
+			const release = vi.fn(() => {
+				if (fault?.source === source && fault.stage === 'disposal')
+					throw new Error('Cannot dispose')
+			})
+			subscriptions.push({ source, emit, failed, release })
+			return release
+		}
+		const admitted = native.ready({})
+		const ready = {
+			...admitted,
+			capabilities: {
+				...admitted.capabilities,
+				observeProfile: ((publish, failed) =>
+					subscribe(
+						'profile',
+						() => publish(null),
+						failed
+					)) satisfies FinanceWorkerCapabilities['observeProfile'],
+				observeWorkspaces: ((publish, failed) =>
+					subscribe(
+						'directory',
+						() => publish([]),
+						failed
+					)) satisfies FinanceWorkerCapabilities['observeWorkspaces'],
+				observeWorkspace: ((_id, publish, failed) =>
+					subscribe(
+						'workspace',
+						() => publish(null),
+						failed
+					)) satisfies FinanceWorkerCapabilities['observeWorkspace'],
+				observeMembership: ((_id, publish, failed) =>
+					subscribe(
+						'membership',
+						() => publish(null),
+						failed
+					)) satisfies FinanceWorkerCapabilities['observeMembership']
+			}
+		}
+		const disposalFailed = vi.fn()
+		function open(
+			workspaceId: string | null,
+			binding: object = {},
+			initialWorkspaces: WorkerWorkspace[] | null = null
+		) {
+			const owner = createActor(financeWorkspaceAccessMachine, {
+				input: {
+					ready,
+					workspaceId,
+					binding,
+					initialWorkspaces,
+					initialProfile: null,
+					reportDisposalFailure: disposalFailed
+				}
+			})
+			owner.start()
+			return owner
+		}
+		return { open, subscriptions, disposalFailed }
+	}
+	it('keeps cached identity and directory facts on a global route without target subscriptions', () => {
+		const f = accessFixture()
+		const cached: WorkerWorkspace[] = [{ id: a, name: 'Cached A', defaultCurrency: 'USD' }]
+		const owner = f.open(null, {}, cached)
+		try {
+			expect(f.subscriptions.map((s) => s.source)).toEqual(['profile', 'directory'])
+			expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot())).toMatchObject({
+				status: 'observing',
+				profile: null,
+				workspaces: cached,
+				workspace: undefined,
+				membership: undefined
+			})
+			f.subscriptions.forEach((s) => s.emit())
+			expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot()).workspaces).toEqual([])
+		} finally {
+			owner.stop()
+		}
+		expect(f.subscriptions.every((s) => s.release.mock.calls.length === 1)).toBe(true)
+	})
+	it('keeps unknown target evidence distinct from observed absence without granting access from a directory', () => {
+		const f = accessFixture()
+		const owner = f.open(a, {}, [{ id: a, name: 'A', defaultCurrency: 'USD' }])
+		try {
+			expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot())).toMatchObject({
+				workspace: undefined,
+				membership: undefined
+			})
+			f.subscriptions
+				.filter((s) => s.source === 'workspace' || s.source === 'membership')
+				.forEach((s) => s.emit())
+			expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot())).toMatchObject({
+				status: 'observing',
+				workspace: null,
+				membership: null,
+				workspaces: [{ id: a }]
+			})
+		} finally {
+			owner.stop()
+		}
+	})
+	it.each(['profile', 'directory', 'workspace', 'membership'])(
+		'withdraws all facts and disposes observers after %s read failure',
+		(source) => {
+			const f = accessFixture()
+			const owner = f.open(a)
+			try {
+				f.subscriptions.forEach((s) => s.emit())
+				const failed = f.subscriptions.find((s) => s.source === source)
+				if (!failed) throw new Error('Missing source')
+				failed.failed()
+				f.subscriptions.forEach((s) => s.emit())
+				expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot())).toMatchObject({
+					status: 'failed',
+					profile: undefined,
+					workspaces: null,
+					workspace: undefined,
+					membership: undefined
+				})
+				expect(f.subscriptions.every((s) => s.release.mock.calls.length === 1)).toBe(true)
+			} finally {
+				owner.stop()
+			}
+		}
+	)
+	it.each(['profile', 'directory', 'workspace', 'membership'])(
+		'fails closed after %s subscription construction throws',
+		(source) => {
+			const f = accessFixture({ source, stage: 'construction' })
+			const owner = f.open(a)
+			try {
+				expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot())).toMatchObject({
+					status: 'failed',
+					workspaces: null,
+					profile: undefined
+				})
+				expect(f.subscriptions.every((s) => s.release.mock.calls.length === 1)).toBe(true)
+			} finally {
+				owner.stop()
+			}
+		}
+	)
+	it.each(['profile', 'directory', 'workspace', 'membership'])(
+		'reports %s disposal failure to the native release owner exactly once',
+		(source) => {
+			const f = accessFixture({ source, stage: 'disposal' })
+			const owner = f.open(a)
+			owner.stop()
+			owner.stop()
+			expect(f.disposalFailed).toHaveBeenCalledOnce()
+			expect(f.subscriptions.every((s) => s.release.mock.calls.length === 1)).toBe(true)
+		}
+	)
+	it('rejects foreign reports and retired callbacks across A → B → A', () => {
+		const f = accessFixture()
+		const firstBinding = {}
+		const first = f.open(a, firstBinding)
+		const old = [...f.subscriptions]
+		first.stop()
+		const second = f.open(b)
+		second.stop()
+		const current = f.open(a)
+		try {
+			current.send({
+				type: 'WORKSPACES',
+				binding: firstBinding,
+				rows: [{ id: a, name: 'Retired', defaultCurrency: 'USD' }]
+			})
+			current.send({ type: 'READ_FAILED', binding: firstBinding })
+			old.forEach((s) => {
+				s.emit()
+				s.failed()
+			})
+			expect(selectFinanceWorkspaceAccessFacts(current.getSnapshot())).toMatchObject({
+				status: 'observing',
+				workspaces: null,
+				membership: undefined
+			})
+			f.subscriptions.slice(-4).forEach((s) => s.emit())
+			expect(selectFinanceWorkspaceAccessFacts(current.getSnapshot())).toMatchObject({
+				status: 'observing',
+				workspaces: [],
+				membership: null
+			})
+		} finally {
+			current.stop()
+		}
+	})
+})
 
 describe('Finance worker ownership and selected accounts', () => {
 	it('routes an empty directory back to its original entry when a workspace arrives', async () => {
@@ -603,7 +862,8 @@ describe('Finance worker ownership and selected accounts', () => {
 				selection: scope.selection
 			})
 			expect(f.directory).toHaveLength(count + 1)
-			expect(f.view().workspaceNavigation?.status).toBe('waiting')
+			// Fresh local membership admits the explicit target before the new catalog answers.
+			expect(f.view().workspaceNavigation?.status).toBe('scoped')
 			last(f.directory).publish([{ id: a, name: 'A' }])
 			expect(f.view().workspaceNavigation?.status).toBe('scoped')
 			expect(f.navigate).not.toHaveBeenCalled()
@@ -1126,6 +1386,167 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.stop()
 		}
 	})
+
+	it('waits for an issued profile save in the identity owner before acknowledging clean native close', async () => {
+		const f = fixture(),
+			saved = Promise.withResolvers<void>()
+		f.saveProfileName.mockImplementation(() => saved.promise)
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			last(f.queries).publish([])
+			const scope = f.view()
+			f.actor.send({
+				type: 'PROFILE',
+				form: 'name',
+				command: { type: 'SUBMIT', values: { displayName: 'Saved identity' } },
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			await vi.waitFor(() => expect(f.saveProfileName).toHaveBeenCalledOnce())
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+			expect(f.actor.getSnapshot().output).toBeUndefined()
+			saved.resolve()
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+			expect(f.saveProfileName).toHaveBeenCalledExactlyOnceWith(
+				'22222222-2222-4222-8222-222222222222',
+				userId,
+				'Saved identity'
+			)
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+		} finally {
+			saved.resolve()
+			f.stop()
+		}
+	})
+
+	it('keeps an identity profile intent admissible across workspace revision changes while rejecting another native session', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.directory).publish([
+				{ id: a, name: 'A' },
+				{ id: b, name: 'B' }
+			])
+			last(f.queries).publish([])
+			const origin = f.view()
+			f.select(b, 2)
+			expect(f.view().selection.revision).not.toBe(origin.selection.revision)
+			const intent = {
+				type: 'PROFILE',
+				form: 'name',
+				command: {
+					type: 'SUBMIT',
+					values: { displayName: 'Identity across workspace navigation' }
+				},
+				selection: origin.selection,
+				sessionRevision: origin.sessionRevision
+			} satisfies Parameters<typeof f.actor.send>[0]
+			f.actor.send({ ...intent, sessionRevision: origin.sessionRevision + 1 })
+			expect(f.saveProfileName).not.toHaveBeenCalled()
+			f.actor.send(intent)
+			await vi.waitFor(() => expect(f.saveProfileName).toHaveBeenCalledOnce())
+			expect(f.saveProfileName).toHaveBeenCalledExactlyOnceWith(
+				'22222222-2222-4222-8222-222222222222',
+				userId,
+				'Identity across workspace navigation'
+			)
+		} finally {
+			f.stop()
+		}
+	})
+
+	it('waits independently for both identity and financial receipts before native closure', async () => {
+		const f = fixture(),
+			profile = Promise.withResolvers<void>(),
+			archive = Promise.withResolvers<void>()
+		f.saveProfileName.mockImplementation(() => profile.promise)
+		f.archiveWrite.mockImplementation(() => archive.promise)
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			last(f.queries).publish([row('Wallet')])
+			const scope = f.view()
+			f.actor.send({
+				type: 'PROFILE',
+				form: 'name',
+				command: { type: 'SUBMIT', values: { displayName: 'Held profile' } },
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			await vi.waitFor(() => {
+				expect(f.saveProfileName).toHaveBeenCalledOnce()
+				expect(f.archiveWrite).toHaveBeenCalledOnce()
+			})
+			f.actor.send({ type: 'CLOSE' })
+			archive.resolve()
+			await vi.waitFor(() =>
+				expect(
+					f.actor
+						.getSnapshot()
+						.context.forms?.owner.getSnapshot()
+						.matches({ closing: { financial: 'closed' } })
+				).toBe(true)
+			)
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+			profile.resolve()
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.saveProfileName).toHaveBeenCalledOnce()
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+		} finally {
+			profile.resolve()
+			archive.resolve()
+			f.stop()
+		}
+	})
+
+	it('never publishes an old financial success under newer workspace observations', async () => {
+		const f = fixture()
+		let subscription: { unsubscribe: () => void } | undefined
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.directory).publish([
+				{ id: a, name: 'A' },
+				{ id: b, name: 'B' }
+			])
+			last(f.queries).publish([])
+			f.create({ type: 'SUBMIT', values: { name: 'Only A', kind: 'cash', currency: 'USD' } })
+			await vi.waitFor(() => expect(f.view().accountCreation?.content.kind).toBe('success'))
+			const owner = f.actor.getSnapshot().context.forms?.owner
+			if (!owner) throw new Error('Missing form owner')
+			const results: string[] = []
+			let observedNewScope = 0
+			subscription = owner.subscribe((snapshot) => {
+				if (snapshot.context.observation.creation.organizationId !== b) return
+				observedNewScope += 1
+				const view = selectFinanceFormsView(snapshot)
+				if (view.creation?.content.kind === 'success')
+					results.push(view.creation.content.value.name)
+			})
+			f.select(b, 2)
+			last(f.queries).publish([])
+			expect(observedNewScope).toBeGreaterThan(0)
+			expect(results).not.toContain('Only A')
+			expect(f.createWrite).toHaveBeenCalledOnce()
+		} finally {
+			subscription?.unsubscribe()
+			f.stop()
+		}
+	})
 	it('retains issued initialization writes until local settlement before closing the SDK', async () => {
 		const initial = workspaceCreationFixture(),
 			pending = Promise.withResolvers<void>()
@@ -1140,11 +1561,41 @@ describe('Finance worker ownership and selected accounts', () => {
 		try {
 			await f.start()
 			await vi.waitFor(() => expect(initial.wait).toHaveBeenCalledOnce())
+			await vi.waitFor(() => expect(f.actor.getSnapshot().context.formsView).toBeDefined())
+			const formsView = f.actor.getSnapshot().context.formsView
+			if (!formsView) throw new Error('Missing current forms report')
 			f.actor.send({ type: 'CLOSE' })
+			f.actor.send({
+				type: 'FORMS_VIEW',
+				binding: {},
+				view: { ...formsView, status: 'failed', creation: null, transaction: null, edit: null }
+			})
+			expect(f.actor.getSnapshot().matches('draining')).toBe(true)
 			expect(f.nativeClose).not.toHaveBeenCalled()
 			pending.resolve()
 			await waitFor(f.actor, (s) => s.status === 'done')
 			expect(f.nativeClose).toHaveBeenCalledOnce()
+		} finally {
+			f.stop()
+		}
+	})
+	it('refuses native release when initialization reported unknown settlement before shutdown', async () => {
+		const initial = workspaceCreationFixture()
+		initial.one.mockReset().mockResolvedValue(null)
+		initial.wait.mockRejectedValue(new Error('Local settlement unavailable'))
+		const f = fixture({
+			...initial.db,
+			all: vi.fn().mockResolvedValue([]),
+			getConfig: () => ({ serverUrl: 'https://authority.invalid' })
+		})
+		try {
+			await f.start()
+			await vi.waitFor(() => expect(f.view().workspaceStartup).toBe('failed'))
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			f.actor.send({ type: 'CLOSE' })
+			await waitFor(f.actor, (snapshot) => snapshot.matches('drainFailed'))
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.actor.getSnapshot().output).toBeUndefined()
 		} finally {
 			f.stop()
 		}
@@ -1734,6 +2185,9 @@ describe('Finance worker ownership and selected accounts', () => {
 					f.actor
 						.getSnapshot()
 						.context.forms?.owner.getSnapshot()
+						.children.workspace?.getSnapshot()
+						.children.resource?.getSnapshot()
+						.children.financial?.getSnapshot()
 						.matches({ closing: { archive: 'closed' } })
 				).toBe(true)
 			)
@@ -1769,17 +2223,24 @@ describe('Finance worker ownership and selected accounts', () => {
 			expect(f.view().accounts).toMatchObject([row('first A')])
 			f.select(b, 2)
 			expect(f.view().accounts).toEqual([])
+			await vi.waitFor(() => expect(last(f.queries).workspaceId).toBe(b))
 			const second = last(f.queries)
 			second.publish([row('B')])
 			first.publish([row('late first A')])
 			if (!firstBinding) throw new Error('Missing retired binding')
-			f.actor.getSnapshot().children.queries?.send({
-				type: 'ACCOUNTS',
-				binding: firstBinding,
-				rows: [{ ...row('stale report'), organizationId: a, archivedAt: null }]
-			})
+			f.actor
+				.getSnapshot()
+				.context.forms?.owner.getSnapshot()
+				.children.workspace?.getSnapshot()
+				.children.resource?.getSnapshot()
+				.children.queries?.send({
+					type: 'ACCOUNTS',
+					binding: firstBinding,
+					rows: [{ ...row('stale report'), organizationId: a, archivedAt: null }]
+				})
 			expect(f.view().accounts).toMatchObject([row('B')])
 			f.select(a, 3)
+			await vi.waitFor(() => expect(last(f.queries).workspaceId).toBe(a))
 			last(f.queries).publish([row('new A')])
 			first.publish([row('original A')])
 			expect(f.view().accounts).toMatchObject([row('new A')])
@@ -1815,6 +2276,106 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.stop()
 		}
 	})
+	it('reports synchronous subscription construction failure without exposing an empty directory as ready', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			const next = f.ready({})
+			f.publishSession({
+				...next,
+				capabilities: {
+					...next.capabilities,
+					observeWorkspaces: () => {
+						throw new Error('Native directory subscribe failed')
+					}
+				}
+			})
+			await vi.waitFor(() => expect(f.view().status).toBe('failed'))
+			expect(f.view().workspaces).toBeNull()
+			expect(f.view().accounts).toEqual([])
+			expect(f.createWrite).not.toHaveBeenCalled()
+			expect(f.nativeClose).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
+	it.each(['directory', 'membership'])(
+		'withdraws financial content when the composed access %s read fails',
+		async (source) => {
+			const f = fixture()
+			try {
+				await f.start()
+				f.select(a, 1)
+				last(f.directory).publish([{ id: a, name: 'A' }])
+				const query = last(f.queries)
+				query.publish([row('Visible')])
+				expect(f.view().accounts).toMatchObject([row('Visible')])
+				const access = source === 'directory' ? last(f.directory) : last(f.memberships)
+				access.failed()
+				expect(f.view()).toMatchObject({ status: 'failed', accounts: [], workspaces: null })
+				expect(query.release).toHaveBeenCalledOnce()
+				query.publish([row('Late')])
+				expect(f.view().accounts).toEqual([])
+				expect(f.createWrite).not.toHaveBeenCalled()
+				expect(f.nativeClose).not.toHaveBeenCalled()
+			} finally {
+				f.stop()
+			}
+		}
+	)
+
+	it('retains access observations when same-workspace content reads change', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.select(a, 1)
+			const directory = last(f.directory),
+				membership = last(f.memberships),
+				query = last(f.queries)
+			const count = f.directory.length
+			const accessBinding = f.actor.getSnapshot().context.accessBinding
+			f.selectKind('income', 2)
+			expect(f.directory).toHaveLength(count)
+			expect(last(f.memberships)).toBe(membership)
+			expect(directory.release).not.toHaveBeenCalled()
+			expect(query.release).toHaveBeenCalledOnce()
+			expect(f.actor.getSnapshot().context.accessBinding).toBe(accessBinding)
+			directory.publish([{ id: a, name: 'Current A' }])
+			membership.publish(null)
+			expect(f.actor.getSnapshot().context.facts).toMatchObject({
+				workspaces: [{ name: 'Current A' }],
+				membership: null
+			})
+			f.select(b, 3)
+			expect(directory.release).toHaveBeenCalledOnce()
+			expect(f.actor.getSnapshot().context.accessBinding).not.toBe(accessBinding)
+		} finally {
+			f.stop()
+		}
+	})
+	it('keeps access observations live after financial read failure while content remains withdrawn', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.select(a, 1)
+			const directory = last(f.directory),
+				membership = last(f.memberships),
+				query = last(f.queries)
+			query.publish([row('Visible')])
+			query.failed()
+			expect(f.view().status).toBe('failed')
+			expect(directory.release).not.toHaveBeenCalled()
+			directory.publish([{ id: b, name: 'New directory evidence' }])
+			membership.publish(null)
+			query.publish([row('Retired')])
+			expect(f.view()).toMatchObject({ status: 'failed', accounts: [], workspaces: [{ id: b }] })
+			expect(f.actor.getSnapshot().context.facts?.membership).toBeNull()
+			expect(query.release).toHaveBeenCalledOnce()
+			expect(f.createWrite).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
 	it('withdraws a failed read and supports a new selected query without replaying any write', async () => {
 		const f = fixture()
 		try {
@@ -1827,6 +2388,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			expect(query.release).toHaveBeenCalledOnce()
 			f.select(b, 2)
 			last(f.directory).publish([{ id: b, name: 'B' }])
+			await vi.waitFor(() => expect(last(f.queries).workspaceId).toBe(b))
 			last(f.queries).publish([])
 			expect(f.view()).toMatchObject({
 				status: 'ready',
@@ -1926,13 +2488,13 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			expect(f.archiveWrite).toHaveBeenCalledOnce()
 			expect(f.view().accounts[0]?.archiveAction).toBe('archiving')
@@ -1966,21 +2528,26 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Original A').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			f.select(b, 2)
-			last(f.queries).publish([row('B')])
+			expect(f.queries).toHaveLength(1)
+			expect(f.view().accounts).toEqual([])
 			f.actor.send({
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('B').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			f.select(a, 3)
-			last(f.queries).publish([row('New A')])
+			expect(f.queries).toHaveLength(1)
+			expect(f.view().accounts).toEqual([])
 			expect(f.view().archiveFeedback).toBeNull()
 			expect(f.nativeClose).not.toHaveBeenCalled()
 			held.resolve()
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			expect(last(f.queries).workspaceId).toBe(a)
+			last(f.queries).publish([row('New A')])
 			await vi.waitFor(() => expect(f.view().accounts[0]?.archiveAction).toBe('available'))
 			expect(f.view().archiveFeedback).toBeNull()
 			expect(f.archiveWrite).toHaveBeenCalledOnce()
@@ -2003,7 +2570,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			expect(f.archiveWrite).toHaveBeenCalledOnce()
 			f.publishSession(f.ready({}))
@@ -2045,7 +2612,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			expect(f.view().accounts[0]?.archiveAction).toBe('unavailable')
 			expect(f.archiveWrite).not.toHaveBeenCalled()
@@ -2057,7 +2624,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			expect(f.archiveWrite).not.toHaveBeenCalled()
 			last(f.grants).publish([
@@ -2075,7 +2642,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			await vi.waitFor(() => expect(f.view().archiveFeedback?.outcome).toBe('succeeded'))
 			expect(f.archiveWrite).toHaveBeenCalledOnce()
@@ -2095,7 +2662,7 @@ describe('Finance worker ownership and selected accounts', () => {
 				type: 'ARCHIVE_ACCOUNT',
 				sessionRevision: f.view().sessionRevision,
 				accountId: row('Wallet').id,
-				selection: { workspaceId: a, revision: 1 }
+				selection: { ...f.view().selection, workspaceId: a, revision: 1 }
 			})
 			await vi.waitFor(() =>
 				expect(f.view().archiveFeedback).toEqual({
@@ -2116,9 +2683,17 @@ describe('Finance worker ownership and selected accounts', () => {
 		const f = fixture()
 		try {
 			await f.start()
+			f.select(a, 1)
+			expect(
+				f.actor.getSnapshot().context.forms?.owner.getSnapshot().children.workspace?.getSnapshot()
+					.children.resource
+			).toBeDefined()
 			f.actor
 				.getSnapshot()
 				.context.forms?.owner.getSnapshot()
+				.children.workspace?.getSnapshot()
+				.children.resource?.getSnapshot()
+				.children.financial?.getSnapshot()
 				.children.archive?.send({ type: 'SHUTDOWN' })
 			await waitFor(f.actor, (snapshot) => snapshot.matches('drainFailed'))
 			f.actor.send({ type: 'CLOSE' })
@@ -2190,25 +2765,29 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.stop()
 		}
 	})
-	it('does not acknowledge clean close when query disposal throws', async () => {
-		const f = fixture()
-		try {
-			await f.start()
-			f.select(a, 1)
-			last(f.queries).release.mockImplementation(() => {
-				throw new Error('Synthetic query disposal failure')
-			})
-			f.actor.send({ type: 'CLOSE' })
-			await waitFor(f.actor, (s) => s.matches('cleanupFailed'))
-			expect(f.actor.getSnapshot().output).toBeUndefined()
-			expect(f.closeAccountStore).not.toHaveBeenCalled()
-			expect(f.closeBroker).not.toHaveBeenCalled()
-			f.actor.send({ type: 'CLOSE' })
-			expect(f.actor.getSnapshot().matches('cleanupFailed')).toBe(true)
-		} finally {
-			f.stop()
+	it.each(['query', 'access directory'])(
+		'does not acknowledge clean close when %s disposal throws',
+		async (source) => {
+			const f = fixture()
+			try {
+				await f.start()
+				f.select(a, 1)
+				const subscription = source === 'query' ? last(f.queries) : last(f.directory)
+				subscription.release.mockImplementation(() => {
+					throw new Error('Synthetic subscription disposal failure')
+				})
+				f.actor.send({ type: 'CLOSE' })
+				await waitFor(f.actor, (s) => s.matches('cleanupFailed'))
+				expect(f.actor.getSnapshot().output).toBeUndefined()
+				expect(f.closeAccountStore).not.toHaveBeenCalled()
+				expect(f.closeBroker).not.toHaveBeenCalled()
+				f.actor.send({ type: 'CLOSE' })
+				expect(f.actor.getSnapshot().matches('cleanupFailed')).toBe(true)
+			} finally {
+				f.stop()
+			}
 		}
-	})
+	)
 	it('withdraws retained rows when the host is forcibly stopped without fabricating native close', async () => {
 		const f = fixture()
 		try {
@@ -2378,10 +2957,16 @@ describe('worker restoration and financial drain', () => {
 		try {
 			await f.start()
 			const previous = f.actor.getSnapshot().context.forms?.owner
+			const accessBinding = f.actor.getSnapshot().context.accessBinding
 			const r = restoreFixture(f)
 			await waitFor(r.actor, (s) => s.status === 'done')
 			await waitFor(f.actor, (s) => s.matches({ running: 'ready' }))
 			expect(f.actor.getSnapshot().context.forms?.owner).not.toBe(previous)
+			expect(f.actor.getSnapshot().context.accessBinding).not.toBe(accessBinding)
+			f.actor
+				.getSnapshot()
+				.children.workspaceAccess?.send({ type: 'READ_FAILED', binding: accessBinding })
+			expect(f.actor.getSnapshot().context.accessFacts?.status).toBe('observing')
 			expect(f.view().identityRestore).toMatchObject({ busy: false, feedback: 'sessionFailed' })
 			expect(f.changeIdentity).toHaveBeenCalledOnce()
 			f.actor.send({
@@ -2833,4 +3418,516 @@ describe('ordered provider sign-out', () => {
 			}
 		}
 	)
+})
+
+describe('Finance leased domain resource group', () => {
+	function resources(fault?: 'disposal') {
+		const f = fixture(),
+			binding = {},
+			capabilities = f.ready(binding).capabilities
+		const baseline = selectFinanceFormObservations(undefined)
+		const forms = {
+			...baseline,
+			profile: { ...baseline.profile, binding },
+			archive: { ...baseline.archive, organizationId: a }
+		}
+		const observation: FinanceResourceObservation = {
+			forms: {
+				observation: forms,
+				selectionRevision: 1,
+				offline: false,
+				initialization: undefined
+			},
+			read: { binding: {}, selection: { workspaceId: a, revision: 1 }, transactionId: null }
+		}
+		capabilities.createForms(
+			() => forms,
+			capabilities.archiveAccount,
+			f.navigate,
+			{ read: async () => [], write: async () => {} },
+			() => {},
+			false,
+			() => {},
+			() => {}
+		)
+		const financial = f.financialGroup()
+		const reportDisposalFailure = vi.fn()
+		const logic = createFinanceWorkspaceResources({
+			financial,
+			capabilities: fault
+				? {
+						...capabilities,
+						observeAccounts: (_id, publish) => {
+							publish([])
+							return () => {
+								throw new Error('Native release failed')
+							}
+						}
+					}
+				: capabilities,
+			reportDisposalFailure
+		})
+		const lease = {
+			scope: { binding, attachment: {} },
+			request: { workspaceId: a, attempt: 1 },
+			epoch: 1
+		}
+		const actor = createActor(logic, { input: { lease } }).start()
+		return {
+			f,
+			actor,
+			observation,
+			reportDisposalFailure,
+			close: () => {
+				actor.stop()
+				f.stop()
+			}
+		}
+	}
+
+	it('waits for correlated lease observations before constructing financial resources', async () => {
+		const r = resources()
+		try {
+			expect(r.f.queries).toHaveLength(0)
+			expect(r.actor.getSnapshot().children.financial).toBeUndefined()
+			r.actor.send({
+				type: 'OBSERVE',
+				observation: {
+					...r.observation,
+					read: { ...r.observation.read, selection: { workspaceId: b, revision: 2 } }
+				}
+			})
+			expect(r.f.queries).toHaveLength(0)
+			r.actor.send({ type: 'OBSERVE', observation: r.observation })
+			expect(r.f.queries).toHaveLength(1)
+			expect(r.actor.getSnapshot().children.financial).toBeDefined()
+			r.actor.send({ type: 'SHUTDOWN' })
+			await waitFor(r.actor, (snapshot) => snapshot.status === 'done')
+			expect(r.actor.getSnapshot().output).toEqual({ outcome: 'released' })
+			expect(last(r.f.queries).release).toHaveBeenCalledOnce()
+		} finally {
+			r.close()
+		}
+	})
+
+	it('replaces only route reads while keeping financial controllers and ignoring retired callbacks', async () => {
+		const r = resources()
+		try {
+			r.actor.send({ type: 'OBSERVE', observation: r.observation })
+			const financial = r.actor.getSnapshot().children.financial
+			const original = last(r.f.queries)
+			const next: FinanceResourceObservation = {
+				forms: {
+					...r.observation.forms,
+					selectionRevision: 2,
+					observation: { ...r.observation.forms.observation }
+				},
+				read: {
+					...r.observation.read,
+					binding: {},
+					transactionId: '30000000-0000-4000-8000-000000000001',
+					selection: { workspaceId: a, revision: 2 }
+				}
+			}
+			r.actor.send({ type: 'OBSERVE', observation: next })
+			expect(original.release).toHaveBeenCalledOnce()
+			expect(r.f.queries).toHaveLength(2)
+			expect(r.actor.getSnapshot().children.financial).toBe(financial)
+			last(r.f.queries).publish([row('Current route')])
+			original.publish([row('Retired route')])
+			expect(selectFinanceWorkspaceResources(r.actor.getSnapshot()).content?.binding).toBe(
+				next.read.binding
+			)
+			expect(
+				selectFinanceWorkspaceResources(r.actor.getSnapshot()).content?.accounts?.map(
+					(account) => account.name
+				)
+			).toEqual(['Current route'])
+			r.actor.send({ type: 'SHUTDOWN' })
+			await waitFor(r.actor, (snapshot) => snapshot.status === 'done')
+			expect(last(r.f.queries).release).toHaveBeenCalledOnce()
+		} finally {
+			r.close()
+		}
+	})
+
+	it('retains unresolved native custody rather than closing after query disposal failure', () => {
+		const r = resources('disposal')
+		try {
+			r.actor.send({ type: 'OBSERVE', observation: r.observation })
+			r.actor.send({ type: 'SHUTDOWN' })
+			expect(selectFinanceWorkspaceResources(r.actor.getSnapshot()).failed).toBe(true)
+			expect(r.reportDisposalFailure).toHaveBeenCalledOnce()
+			expect(r.actor.getSnapshot().status).toBe('active')
+			expect(r.actor.getSnapshot().output).toBeUndefined()
+			r.actor.send({ type: 'SHUTDOWN' })
+			expect(r.actor.getSnapshot().output).toBeUndefined()
+		} finally {
+			r.close()
+		}
+	})
+	it('retains live content custody after unexpected financial completion', async () => {
+		const r = resources()
+		try {
+			r.actor.send({ type: 'OBSERVE', observation: r.observation })
+			const financial = r.actor.getSnapshot().children.financial
+			if (!financial) throw new Error('Missing admitted financial owner')
+			financial.send({ type: 'SHUTDOWN' })
+			await waitFor(r.actor, (snapshot) => selectFinanceWorkspaceResources(snapshot).failed)
+			expect(last(r.f.queries).release).not.toHaveBeenCalled()
+			expect(r.actor.getSnapshot().children.queries?.getSnapshot().status).toBe('active')
+			r.actor.send({ type: 'SHUTDOWN' })
+			expect(r.actor.getSnapshot().output).toBeUndefined()
+			expect(last(r.f.queries).release).not.toHaveBeenCalled()
+		} finally {
+			r.close()
+		}
+	})
+
+	it('treats unsolicited query completion as failure while retaining financial ownership', async () => {
+		const r = resources()
+		try {
+			r.actor.send({ type: 'OBSERVE', observation: r.observation })
+			const financial = r.actor.getSnapshot().children.financial
+			const queries = r.actor.getSnapshot().children.queries
+			if (!queries) throw new Error('Missing admitted query owner')
+			queries.send({ type: 'SHUTDOWN' })
+			expect(selectFinanceWorkspaceResources(r.actor.getSnapshot()).failed).toBe(true)
+			expect(last(r.f.queries).release).toHaveBeenCalledOnce()
+			expect(r.actor.getSnapshot().children.financial).toBe(financial)
+			expect(financial?.getSnapshot().status).toBe('active')
+			r.actor.send({ type: 'SHUTDOWN' })
+			expect(r.actor.getSnapshot().output).toBeUndefined()
+		} finally {
+			r.close()
+		}
+	})
+})
+
+describe('production shared workspace leases', () => {
+	async function gated() {
+		const f = fixture()
+		await f.start()
+		const ready = f.actor.getSnapshot().context.ready
+		if (!ready) throw new Error('Missing native binding')
+		let publish = (_row: ArchiveObservation['membership']) => {}
+		const membership = (workspaceId: string): NonNullable<ArchiveObservation['membership']> => ({
+			id: '40000000-0000-4000-8000-000000000001',
+			organizationId: workspaceId,
+			userId,
+			role: 'owner',
+			accountAccessMode: 'all',
+			profileId: null
+		})
+		f.publishSession({
+			...ready,
+			capabilities: {
+				...ready.capabilities,
+				observeMembership: (_workspaceId, next) => {
+					publish = next
+					return () => {}
+				}
+			}
+		})
+		f.actor.send({
+			type: 'OBSERVE_ROUTE',
+			pathname: '/expenses',
+			search: '?workspace=' + a,
+			hash: '',
+			revision: 1
+		})
+		const lease = () => {
+			const forms = f.actor.getSnapshot().context.forms
+			return forms ? selectFinanceFormsLease(forms.owner.getSnapshot()) : undefined
+		}
+		return {
+			f,
+			lease,
+			membership,
+			publish: (row: ArchiveObservation['membership']) => publish(row)
+		}
+	}
+
+	it('keeps identity controls available with unknown access and admits local content without waiting for the directory', async () => {
+		const r = await gated(),
+			{ f } = r
+		try {
+			expect(f.queries).toHaveLength(0)
+			expect(r.lease()).toBeUndefined()
+			expect(f.view().profile).not.toBeNull()
+			r.publish(r.membership(a))
+			expect(f.queries).toHaveLength(1)
+			last(f.queries).publish([row('Locally available')])
+			expect(f.view()).toMatchObject({
+				status: 'ready',
+				workspaces: null,
+				accounts: [row('Locally available')],
+				workspaceNavigation: { status: 'scoped', showContent: true }
+			})
+			last(f.directory).publish([])
+			expect(f.queries).toHaveLength(1)
+			expect(f.view().accounts).toMatchObject([row('Locally available')])
+		} finally {
+			f.stop()
+		}
+	})
+
+	it('retains the workspace lease and financial controllers when only the route read scope changes', async () => {
+		const r = await gated(),
+			{ f } = r
+		try {
+			r.publish(r.membership(a))
+			const before = r.lease()
+			const resource = f.actor
+				.getSnapshot()
+				.context.forms?.owner.getSnapshot()
+				.children.workspace?.getSnapshot().children.resource
+			const financial = resource?.getSnapshot().children.financial
+			const query = last(f.queries)
+			f.selectKind('income', 2)
+			expect(r.lease()).toBe(before)
+			expect(resource?.getSnapshot().children.financial).toBe(financial)
+			expect(query.release).toHaveBeenCalledOnce()
+			expect(f.queries).toHaveLength(2)
+			last(f.queries).publish([row('New route')])
+			query.publish([row('Retired route')])
+			expect(f.view().accounts).toMatchObject([row('New route')])
+		} finally {
+			f.stop()
+		}
+	})
+
+	it('withdraws admission on revocation and waits for an issued write before regrant, rejecting the retired lease and facts', async () => {
+		const r = await gated(),
+			{ f } = r,
+			held = Promise.withResolvers<void>()
+		f.archiveWrite.mockImplementation(() => held.promise)
+		try {
+			r.publish(r.membership(a))
+			last(f.queries).publish([row('Original')])
+			const before = r.lease(),
+				content = f.actor.getSnapshot().context.contentFacts
+			if (!before || !content) throw new Error('Missing admitted content')
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: f.view().sessionRevision,
+				selection: f.view().selection,
+				accountId: row('Original').id
+			})
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+			r.publish(null)
+			expect(r.lease()).toBeUndefined()
+			expect(f.view().accounts).toEqual([])
+			expect(f.view().workspaceNavigation?.showContent).toBe(false)
+			r.publish(r.membership(a))
+			expect(f.queries).toHaveLength(1)
+			expect(r.lease()).toBeUndefined()
+			held.resolve()
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			expect(r.lease()?.epoch).toBeGreaterThan(before.epoch)
+			last(f.queries).publish([row('Regranted')])
+			f.actor.send({
+				type: 'CONTENT_FACTS',
+				binding: before.scope.binding,
+				lease: before,
+				facts: content
+			})
+			expect(f.view().accounts).toMatchObject([row('Regranted')])
+			f.actor
+				.getSnapshot()
+				.context.forms?.owner.getSnapshot()
+				.children.workspace?.send({
+					type: 'RESOURCE_COMMAND',
+					lease: before,
+					command: {
+						type: 'FINANCIAL',
+						command: { type: 'ARCHIVE_ACCOUNT', accountId: row('Original').id }
+					}
+				})
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+		} finally {
+			held.resolve()
+			f.stop()
+		}
+	})
+
+	it('refuses delayed same-route commands and private payloads after revocation/regrant while accepting fresh scopes', async () => {
+		const r = await gated(),
+			{ f } = r
+		try {
+			r.publish(r.membership(a))
+			last(f.queries).publish([row('Before')])
+			const old = f.view(),
+				oldLease = r.lease()
+			if (!oldLease) throw new Error('Missing original lease')
+			r.publish(null)
+			r.publish(r.membership(a))
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			last(f.queries).publish([row('After')])
+			const fresh = f.view()
+			expect(fresh.selection.revision).toBe(old.selection.revision)
+			expect(fresh.sessionRevision).toBe(old.sessionRevision)
+			expect(fresh.selection.activation?.epoch).toBeGreaterThan(
+				old.selection.activation?.epoch ?? 0
+			)
+			expect(selectFinanceBackupAdmission(f.actor.getSnapshot(), old)).toBeUndefined()
+			expect(selectFinanceBankAdmission(f.actor.getSnapshot(), old)).toBeUndefined()
+			expect(selectFinanceBackupAdmission(f.actor.getSnapshot(), fresh)).toBeDefined()
+			expect(selectFinanceBankAdmission(f.actor.getSnapshot(), fresh)).toBeDefined()
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: old.sessionRevision,
+				selection: old.selection,
+				accountId: row('After').id
+			})
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: fresh.sessionRevision,
+				selection: { workspaceId: a, revision: fresh.selection.revision },
+				accountId: row('After').id
+			})
+			expect(f.archiveWrite).not.toHaveBeenCalled()
+			const secret = prepareBackupSubmission('password', 'discarded-fixture-secret')
+			const backupRelease = vi.fn(secret.release)
+			const file = prepareWorkspaceRestoreFile(new File(['discarded'], 'retired-backup'), '')
+			const fileRelease = vi.fn(() => file.release())
+			f.actor.send({
+				type: 'START_BACKUP',
+				sessionRevision: old.sessionRevision,
+				selection: old.selection,
+				submission: { ...secret, release: backupRelease }
+			})
+			f.actor.send({
+				type: 'START_WORKSPACE_RESTORE',
+				sessionRevision: old.sessionRevision,
+				selection: old.selection,
+				request: { ...file, release: fileRelease }
+			})
+			expect(backupRelease).toHaveBeenCalledOnce()
+			expect(fileRelease).toHaveBeenCalledOnce()
+			expect(() => takeBackupProtection(secret)).toThrow('Backup submission unavailable')
+			expect(workspaceRestoreFileAvailable(file)).toBe(false)
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: fresh.sessionRevision,
+				selection: fresh.selection,
+				accountId: row('After').id
+			})
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+		} finally {
+			f.stop()
+		}
+	})
+
+	it('distinguishes forms reattachment when native binding, route revision and lease epoch repeat', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.queries).publish([row('Before')])
+			await vi.waitFor(() => expect(f.view().canRetryInitialization).toBe(true))
+			const old = f.view(),
+				binding = f.actor.getSnapshot().context.ready?.binding
+			f.actor.send({
+				type: 'RETRY_INITIALIZATION',
+				sessionRevision: old.sessionRevision,
+				selection: old.selection
+			})
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			last(f.queries).publish([row('Reattached')])
+			const fresh = f.view()
+			expect(f.actor.getSnapshot().context.ready?.binding).toBe(binding)
+			expect(fresh.sessionRevision).toBe(old.sessionRevision)
+			expect(fresh.selection.revision).toBe(old.selection.revision)
+			expect(fresh.selection.activation?.epoch).toBe(old.selection.activation?.epoch)
+			expect(fresh.selection.activation?.attachment).toBeGreaterThan(
+				old.selection.activation?.attachment ?? 0
+			)
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: old.sessionRevision,
+				selection: old.selection,
+				accountId: row('Reattached').id
+			})
+			expect(f.archiveWrite).not.toHaveBeenCalled()
+			expect(selectFinanceBankAdmission(f.actor.getSnapshot(), old)).toBeUndefined()
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				sessionRevision: fresh.sessionRevision,
+				selection: fresh.selection,
+				accountId: row('Reattached').id
+			})
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+			expect(f.nativeClose).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
+
+	it('keeps identity commands usable without a financial activation', async () => {
+		const r = await gated(),
+			{ f } = r
+		try {
+			expect(f.view().selection.activation).toBeUndefined()
+			f.actor.send({
+				type: 'PROFILE',
+				form: 'name',
+				command: { type: 'SUBMIT', values: { displayName: 'Independent identity' } },
+				sessionRevision: f.view().sessionRevision,
+				selection: { workspaceId: a, revision: f.view().selection.revision }
+			})
+			await vi.waitFor(() => expect(f.saveProfileName).toHaveBeenCalledOnce())
+			expect(f.queries).toHaveLength(0)
+		} finally {
+			f.stop()
+		}
+	})
+
+	it('rejects an internal transfer captured before regrant even when binding and route generation are unchanged', async () => {
+		const r = await gated(),
+			{ f } = r
+		try {
+			r.publish(r.membership(a))
+			last(f.queries).publish([])
+			const old = r.lease(),
+				generation = f.view().selection.revision
+			if (!old) throw new Error('Missing old lease')
+			const responses: TransferMutationResponse[] = []
+			const request: TransferMutationRequest = {
+				operation: 'link',
+				workspaceId: a,
+				requestId: 'retired-request',
+				scope: { binding: old.scope.binding, workspaceId: a, generation, lease: old },
+				input: {
+					db: f.formDatabase,
+					organizationId: a,
+					identityId: userId,
+					expenseTransactionId: crypto.randomUUID(),
+					incomeTransactionId: crypto.randomUUID(),
+					trackWrite: () => {}
+				},
+				recipient: { send: (event) => responses.push(event) }
+			}
+			r.publish(null)
+			r.publish(r.membership(a))
+			await vi.waitFor(() => expect(f.queries).toHaveLength(2))
+			last(f.queries).publish([])
+			const fresh = r.lease()
+			if (!fresh) throw new Error('Missing fresh lease')
+			f.actor.send({ type: 'TRANSFER_MUTATION_REQUEST', request })
+			expect(responses).toHaveLength(1)
+			expect(f.transactionDb.beginTransaction).not.toHaveBeenCalled()
+			f.actor.send({
+				type: 'TRANSFER_MUTATION_REQUEST',
+				request: {
+					...request,
+					requestId: 'fresh-request',
+					scope: { binding: fresh.scope.binding, workspaceId: a, generation, lease: fresh }
+				}
+			})
+			await vi.waitFor(() => expect(f.transactionDb.beginTransaction).toHaveBeenCalledOnce())
+		} finally {
+			f.stop()
+		}
+	})
 })

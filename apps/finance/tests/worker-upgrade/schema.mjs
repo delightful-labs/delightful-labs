@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { copyHistoricalSource } from './history-source.mjs'
 
 export function portRuntimeImports(path, lib, runtimeEntry, clipper) {
@@ -95,8 +95,14 @@ export async function checkSchema(directory, source, proof, versions, scope, sdk
 		mkdirSync(join(app, 'tooling'))
 		cpSync(join(source, 'tooling/jazz-wasm.ts'), join(app, 'tooling/jazz-wasm.ts'))
 		mkdirSync(join(app, 'tests/helpers'), { recursive: true })
-		for (const name of ['restore-probe.ts', 'silent-jazz-proxy.ts'])
-			cpSync(join(source, 'tests/helpers', name), join(app, 'tests/helpers', name))
+		cpSync(
+			join(source, 'tests/helpers/restore-probe.ts'),
+			join(app, 'tests/helpers/restore-probe.ts')
+		)
+		cpSync(
+			fileURLToPath(new URL('../../../../scripts/testing/silent-jazz-proxy.ts', import.meta.url)),
+			join(app, 'tests/helpers/silent-jazz-proxy.ts')
+		)
 	}
 	run(['exec', 'jazz-tools', 'generate', '--schema-dir', schemaPath], app)
 	run(['exec', 'jazz-tools', 'generate', '--check', '--schema-dir', schemaPath], app)

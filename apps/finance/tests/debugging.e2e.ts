@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { openCreationModal } from './helpers/ui.js'
 import { failNextAccountStorageOpen } from './helpers/startup-failure.js'
 
@@ -6,6 +6,22 @@ declare global {
 	interface Window {
 		debugFixture: { opens: number; messages: unknown[]; disconnects: number }
 	}
+}
+
+function registrationCount(page: Page, name: string) {
+	return page.evaluate(
+		(name) =>
+			window.debugFixture.messages.filter(
+				(event) =>
+					event !== null &&
+					typeof event === 'object' &&
+					'type' in event &&
+					event.type === '@xstate.actor' &&
+					'name' in event &&
+					event.name === name
+			).length,
+		name
+	)
 }
 
 test.beforeEach(async ({ page, context }) => {
@@ -139,8 +155,21 @@ test('HMR replacement disconnects the old inspector and attaches the new module'
 		.poll(() => page.evaluate(() => window.debugFixture.messages.length))
 		.toBeGreaterThan(0)
 	const before = await page.evaluate(() => window.debugFixture.opens)
-	const latestEvent = await page.evaluate(() => JSON.stringify(window.debugFixture.messages.at(-1)))
-	expect(latestEvent).toBeDefined()
+	// A named actor registration is a unique replay oracle. Ordinary sanitized
+	// snapshots may be identical, including their millisecond timestamps.
+	await page.evaluate(async () => {
+		const originalPath = '/src/lib/diagnostics/inspector.ts'
+		const { inspectActor }: typeof import('../src/lib/diagnostics/inspector.js') = await import(
+			originalPath
+		)
+		const xstatePath = '/node_modules/.vite/deps/xstate.js'
+		const { createActor, createMachine }: typeof import('xstate') = await import(xstatePath)
+		const actor = createActor(createMachine({ id: 'original-hmr-fixture' }), {
+			inspect: inspectActor
+		}).start()
+		actor.stop()
+	})
+	await expect.poll(() => registrationCount(page, 'original-hmr-fixture')).toBe(1)
 	await page.evaluate(async () => {
 		const originalPath = '/src/lib/diagnostics/inspector.ts'
 		const original: typeof import('../src/lib/diagnostics/inspector.js') = await import(
@@ -196,15 +225,11 @@ test('HMR replacement disconnects the old inspector and attaches the new module'
 	})
 	await expect.poll(() => page.evaluate(() => window.debugFixture.disconnects)).toBe(1)
 	await expect.poll(() => page.evaluate(() => window.debugFixture.opens)).toBe(before + 1)
-	await expect
-		.poll(() => page.evaluate(() => JSON.stringify(window.debugFixture.messages)))
-		.toContain('hmr-fixture')
-	const replayCount = await page.evaluate(
-		(first) =>
-			window.debugFixture.messages.filter((event) => JSON.stringify(event) === first).length,
-		latestEvent
-	)
-	expect(replayCount, 'Disposed inspector must not reconnect and replay old events').toBe(1)
+	await expect.poll(() => registrationCount(page, 'hmr-fixture')).toBe(1)
+	expect(
+		await registrationCount(page, 'original-hmr-fixture'),
+		'Disposed inspector must not reconnect and replay old actor registrations'
+	).toBe(1)
 	expect(await page.evaluate(() => JSON.stringify(window.debugFixture.messages))).not.toContain(
 		'retired-hmr-fixture'
 	)
