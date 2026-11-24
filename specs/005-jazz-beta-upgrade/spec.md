@@ -2,21 +2,11 @@
 
 **Created**: 2026-11-24
 
-**Status**: Beta integration implemented on latest main `9344dff2`. Dependency,
-native account admission, worker ownership, expiry/retry recovery and update
-handover changes are installed. Unit, app worker/browser, packaged extension,
-backup/restore, historical-store and static/build checks pass as recorded below.
-The final reproducible broker's offline run exposed a restored-profile capture
-observation failure. Its native-query correction is implemented for both list
-and pending-content subscriptions; all affected final suites pass. Actual
-schema-driven handover passes in both apps, and current-main
-local Finance/Clipper data passes exact comparisons and snapshot recovery. The user
-excluded the older alpha.60 annotations store from migration; its original and
-complete snapshot are preserved. The first hosted qualification found Finance
-startup, transfer-feedback and workspace-browser failures; their investigation
-and corrective qualification are recorded below. Hosted production, retained
-browser profiles and external chunk recovery remain release gates. No production
-deployment has been made.
+**Status**: Beta.1 integration implemented on main baseline `9344dff2`, retaining
+worker ownership. Application/native/offline/extension and recovery checks pass
+within the scope below. All 33 PR checks passed on `683dc411`. Subsequent review
+removes one-off investigation programs and consolidates this spec; those changes
+require their own CI result. Production deployment is not authorized.
 
 **Input**: Upgrade the Delightful Labs monorepo to Jazz beta, using Jazz as
 intended. Behavior changes are acceptable. Earlier implementation choices and
@@ -404,188 +394,55 @@ and generic transaction fixes do not establish a root-cause fix.
 
 ## Implementation status
 
-Started November 24, 2026 on `feat/jazz-beta-upgrade`, based on freshly fetched
-`origin/main` `9344dff27b0cf41e79750d0e3a7564a7e85a66da` (PR #55), in
-`/Users/matt/Projects/delightful-labs-jazz-beta`. Main's shared workspace
-resource/seed owners and app binding changes are included. Unrelated work in the
-original checkout and all user servers/data are preserved. After reviewing the
-completed 74-file diff, the user explicitly authorized committing it, pushing
-`feat/jazz-beta-upgrade` and opening a draft PR to main on November 24. That
-authorization covers publication for review; merge and production deployment
-remain separately gated. The review description is maintained below.
+Draft [PR #56](https://github.com/delightful-labs/delightful-labs/pull/56) targets
+main from `feat/jazz-beta-upgrade`, based on
+`9344dff27b0cf41e79750d0e3a7564a7e85a66da`. The user's implementation, testing,
+commit/push and draft-PR authorizations persist. Merge, production rollout and
+unapproved data acquisition remain separately gated. Original checkouts,
+selectors, user servers and data are preserved.
 
 ### Implemented
 
-- Updated the four active manifests and Local First peer, including Clipper's
-  explicit `jazz-napi`, with the coherent root lockfile. No unrelated package
-  records changed and no active alpha Jazz package remains in that lockfile.
-- Replaced the alpha Jazz patch selection with the beta worker bridge, bounded
-  Chrome extension-origin fix and demonstrated proof/retry recovery fixes;
-  removed the redundant Better Auth peer allowance. Kept the separate provider
-  patch and historical Jazz patch file.
-- Added `region: 'iad1'` to both Vercel store configurations without changing
-  namespace functions, app identities or storage paths.
-- Adopted native device-account admission in the guest gateway.
-- Derived Clipper's runtime/cache asset version from installed SDK metadata,
-  replacing its stale alpha.60 constant.
-- Wired `onNewerBuild` into Finance and Clipper worker owners. Update intent
-  travels through their existing clean-close progression; only terminal clean
-  output requests Window reload. Competing shutdown/navigation is not overridden.
-- Added a Window-only reload primitive on the existing public broker subpath.
-  It records the old immutable worker URL in session storage to prevent cached
-  old-build reload loops and reports refusal/failure to the existing UI owner.
-  When session storage is unavailable it follows Jazz's best-effort reload
-  behavior; it does not add another persistence or retry mechanism.
-- Updated native gateway expectations: default account lookup stays signed-in
-  only, opt-in lookup and `forReqUser` support device accounts, and a valid new
-  device proof may create its account while invalid proofs remain refused.
-- Migrated 44 device-auth fixture values across 25 files on the latest-main
-  baseline. The earlier source-audit count was 41 before PR #55's added coverage.
-- Added nine focused handover checks: three per application owner and three for
-  the Window reload effect. They cover acknowledged close, failed close,
-  competing close, cached-build loops and unavailable storage/reload effects.
-- Qualified actual SDK schema-ordered handover through both application workers
-  in Chromium, Firefox and WebKit. Finance holds an accepted archive operation
-  before release and verifies exact ledger rows/identity after reload. Clipper
-  retains a saved URL through its real worker/client. Both exercise a delivered
-  descendant build and a cached old build bounded to one reload. Clipper's
-  `test:worker` entry point now includes this native handover suite.
-- Removed the Finance session-retry capability when reload is refused after the
-  worker has already closed. The UI no longer offers an unusable retry command;
-  the native cached-build cases verify this state.
-- Updated the existing upgrade harness to beta. Replaced its removed private
-  upgrade helper with exact native alpha.67/beta schema compilation and permission
-  comparison, including relations and binding-source identity. Historical
-  alpha.60 stores and archives remain independent inputs. Its packed application
-  fixture uses the current app's installed dependencies, existing provider patch,
-  chart peer declarations and standalone page-adapter types.
-- Updated retained readers to compare the current alpha.67 app with beta on
-  scratch copies, preserving each snapshot's local blob mode and using its app's
-  copied schema files for native source checking. Added disposable-copy recovery
-  with a committed beta write/reopen followed by exact baseline snapshot restore.
-  External blob snapshots are refused until complete local materialization is available.
-- Fixed three untyped callback parameters in two Finance component tests found
-  by the full standalone TypeScript check; that check now passes.
-- Added a read-only, reproducible broker verifier using the exact pinned upstream
-  WASM/ABI checker and installed SDK dependencies. Review found that the first
-  rebuild retained working-directory-relative module names inside lazy
-  initializers. Identifier minification in the first bundling pass removes that
-  machine-dependent metadata. The final broker matches across working directories
-  and all four installed consumers; its readable SDK changes remain the same.
-- Replaced the upgrade fixture's stale alpha.67 README with a pointer to this spec.
-  Commands and current decisions remain here; historical research remains linked.
-- Corrected article-list and pending-content subscriptions to use native capture-rooted required
-  includes after a restored-profile failure proved that reverse capture metadata
-  can arrive later than its document. Two real-native cases cover continued
-  observation and malformed capture refusal; the old query fails the new
-  late-metadata regression. Record guards, schemas and permissions are unchanged.
+- Pin the four active Jazz consumers and Clipper's explicit NAPI dependency to
+  beta.1, with a coherent root lock. Remove the obsolete SDK peer allowance;
+  preserve unrelated dependency records and the separate provider patch.
+- Use native device-account gateway admission, keeping publication's explicit
+  provider checks. Update device-auth fixtures to the native account kind.
+- Preserve existing storage paths, app identities, namespace functions and
+  `iad1`; derive Clipper's runtime/cache version from the installed SDK.
+- Route `onNewerBuild` through existing worker shutdown owners and reload only
+  after clean closure. A per-build Window marker bounds cached-old-build loops.
+- Retain only demonstrated worker-platform, extension-origin and proof/retry SDK
+  fixes. The beta patch changes 12 files, as did the alpha patch; native backend
+  account admission is unpatched. Six files bridge Window-only primitives, one
+  bounds explicit extension-origin normalization, and five carry proof/retry and
+  matching broker changes. The broker verifier remains necessary for the shipped
+  generated artifact.
 
-### Review scope
+| Owner | Update progression | Completion rule |
+| --- | --- | --- |
+| Finance application worker | `NEWER_BUILD` → existing CLOSE/domain drain/session-store-broker close | Window reload only after acknowledged clean completion. |
+| Clipper realm host | `NEWER_BUILD` → existing SHUTDOWN/surface-acquisition-session drain | Publish reload only after clean terminal output, including extension consumers. |
+| Window | Reload and retain the old immutable worker-build marker | Refuse a second reload from the same cached old build. |
 
-PR title: **`feat(jazz): adopt beta.1 with worker-owned sessions`**.
+No domain runtime moves into Window. SDK sessions, generation choice, build
+ordering, admission verification and accepted-write draining remain native.
+Competing shutdown/navigation and failed cleanup do not become successful reloads.
 
-Finance, Clipper web/extension and Local First move from alpha.67 to beta.1 while
-keeping domain runtimes and SDK sessions in workers. Clipper now uses native
-device-account admission, including valid new-device creation. Both apps close
-their existing owners before reloading for a schema-ordered newer build, with a
-per-worker-build marker bounding cached-old-build reloads. The retained SDK patch
-is limited to the demonstrated worker-host, extension-origin and proof/retry gaps;
-the generated beta broker is reproducible from its readable modules.
-Clipper's live list and pending-content queries now start from capture metadata
-and use required forward
-includes, so a document arriving before its reverse metadata does not permanently
-end observation. Existing scope and record checks remain enforced.
+### Corrections established by failures
 
-Review includes exact schema/history preservation, matching SDK/native/WASM
-artifacts, packed consumers, the listed unit/native/browser/offline/extension
-checks and real current-main local-store comparison/recovery. The separate
-alpha.60 annotations store is excluded and preserved by explicit user choice.
-The original four Finance save workflows pass unchanged; their intermittent
-historical failures are not claimed fixed. No financial mutation/replay policy,
-production destination, active feature selector or unrelated shared-workspaces
-work is changed.
-
-This is the review description, kept here as the single feature record. Hosted
-CI/preview results must be collected after publication; local verification does
-not establish production acceptance. Production rollout remains separately gated
-by the retained hosted-store/profile/chunk evidence and authorization below.
-
-### Selected worker boundary
-
-| Realm | Responsibility |
+| Failure | Correction and retained requirement |
 | --- | --- |
-| Window | Rendering, SharedWorker creation and generation storage through the narrow host; reload/navigation effects. |
-| Application worker | Jazz session, native app bindings, domain actors, queries, transactions, validation and projections. |
-| Jazz broker SharedWorker | Jazz-owned durable replica, cross-tab coordination and upstream sync. |
+| Clipper document arrived before reverse capture metadata; throwing from projection ended its observer. | Root list and pending-content queries at `documentCaptures`, with native required document includes and the existing pending filter. Keep all four record guards, permissions and histories. Native late-metadata/completion and malformed-link cases pass; the old query fails the regression. |
+| A joining tab reused an expired broker-owner proof; visible retry demanded remote sync through that proof. | Forward the joining proof through native verification and use local flush for explicit retry. The smaller worker/origin-only patch failed five of 33 unchanged native cases; the final patch passes all 33. |
+| Finance transaction reads waited on an established but silent remote connection. | Explicit native LocalFirst reads for transaction edit/tag/check operations. Original offline persistence assertions pass. |
+| Transfer controls disappeared before unlink feedback was rendered. | Keep the existing machine-selected feedback visible after editor deselection. Original unlink assertions pass. |
+| Workspace test helper dispatched a redundant same-value selection and raced navigation. | Skip an already-selected matching route; otherwise await the actual navigation commit. Preserve all permission assertions and sanitized diagnostics. |
+| Clipper CI sampled a newly bound library before its asynchronous ROWS observation. | Observe the exact original saved ID in both documents under the existing 15-second deadline. Keep all six engine/build cases, one reload, cached-old-build refusal and release acknowledgements. A nonexistent-ID control still fails. |
 
-### Restored-profile capture observation correction
-
-Final-artifact qualification reproduced a list failure after a complete offline
-restart and reconnect. Temporary, sanitized record-boundary probes isolated
-`record.capture:too_small@captures` on the restored profile. Its document had
-arrived while the reverse capture relation was still empty. The app's
-`captureDocumentRecord` requires one capture row; throwing from that subscription
-callback permanently ended the existing article-collection observer. This is an
-application query/projection assumption, not evidence that broker minification
-caused the failure or that Jazz refused the account.
-
-The list owner remains the existing article-collection machine and subscription;
-the pending-content owner remains the existing article-worker host.
-Select from native `documentCaptures`, including its document with
-`requireIncludes()`, rather than assuming every locally observed document already
-has its reverse capture metadata. Before that metadata arrives the native query
-has no eligible captured document; subsequent native updates publish the record
-through the same observer. This is local availability, not global absence, and
-does not trigger initialization, repair, a write or a remote preflight.
-Apply the same capture-rooted query to `subscribePending`, keeping its native
-document `attachmentId: null` filter. Metadata arrival admits pending content;
-successful content attachment removes it through the native query update.
-
-Keep the complete document/capture projection and all identity, scope, canonical
-capture-link and malformed-record validation. No retry layer, guessed metadata,
-schema/history edit or permission relaxation is selected. The native SDK's
-required-include behavior filters unresolved non-nullable forward references;
-it does not make reverse relations complete. See the
-[pinned include documentation](https://github.com/garden-co/jazz/blob/c73bed9a4e868071f10de490ae3f753f3081772f/docs/content/docs/reading/includes-and-relations.mdx)
-and [query translation](https://github.com/garden-co/jazz/blob/c73bed9a4e868071f10de490ae3f753f3081772f/packages/jazz-tools/src/runtime/query-adapter.ts).
-Qualification must exercise a real document-before-capture interval and the full
-unchanged production offline/reconciliation case. Diagnostic-only source probes
-are restored after building and are not included in the implementation.
-
-The selected query is implemented in `queries.ts` and the existing article-list
-subscription. Native policy-test coverage passes for a document inserted before
-its capture row: the observer publishes no eligible captured rows, then publishes
-the valid record after a separate native metadata commit. Reinstating the old
-query makes that exact regression fail. The same native case now observes both
-list and pending-content subscriptions, then completes content through the real
-save machine and verifies that the pending query empties while the list remains
-readable. A second native case still refuses a
-capture whose identity does not match its document. All four existing projection
-guards remain unchanged. Final Clipper types pass with zero Svelte warnings;
-all 1,029 unit, 34 component, 33 worker, six handover, 12 production-offline and
-12 packaged-extension cases pass. The full 68-case historical/schema fixture also
-passes with the final queries and expanded arrival/completion regression.
-
-The installed [beta patch](../../patches/jazz-tools@2.0.0-beta.1.patch) changes
-12 SDK files: six worker-platform files, one backend origin-normalization file,
-two peer-admission files, the session retry module, broker core and broker bundle.
-The bridge
-adds worker runtime recognition; declares the existing `browserWorkerHost`
-primitives; awaits host-created ports and generation operations; and excludes
-live functions/handles from configuration cloning and broker messages. It retains
-late-port cleanup and SDK-owned generation selection. There is no Window-host
-migration, domain data proxy or worker-rule exception.
-
-The seventh file admits only an explicitly configured Chrome extension origin:
-32 lowercase characters from `a` through `p`, no credentials, query, fragment or
-non-root path. Other opaque origins and wildcards remain refused. It does not
-change authentication.
-
-The remaining five files forward the joining proof, retain native verification
-and identity/audience fences, flush locally for explicit retry, and ship the
-matching rebuilt beta broker. Backend account admission is unpatched. All 12
-installed files match across the four SDK consumers. Native WASM instantiation
-and the minified broker's WASM ABI checks pass.
+The four original Finance save workflows pass without retries. Their historical
+intermittent unknown-save failures are not claimed comprehensively fixed; preserve
+existing unknown-outcome protections and diagnose actual future error evidence.
 
 ### Verification
 
@@ -626,297 +483,83 @@ and verification reported here. No release authorization is inferred.
 | Shared-lockfile regressions | UI static check and 131 unit cases pass. Website static check, 152 unit cases, production build and built-route/feed/sitemap verification pass. |
 | Changed-file quality | Existing per-project formatters and Local First/Clipper lint pass. Staged source/docs pass whitespace checks; the generated SDK patch applies to the pristine beta tarball with `--check --whitespace=error-all`. Local spec links, shared guidance and all 23 monorepo tooling cases pass. |
 
-The initial seven-file worker/origin-only patch passed 28 Clipper worker cases
-and failed five expiry/refusal-recovery cases. A new tab could not join after
-the broker owner's proof expired (`token expired`), and visible retry failed with
-`GracefulShutdownSyncError` while demanding remote sync through that expired
-proof. These actual failures justify the bounded proof forwarding and retry
-changes. The rebuilt final patch passes all 33 unchanged worker cases; no
-refusal checks or timeouts were weakened. Earlier offline runs alternated between
-11/12 and 12/12; passing did not establish that the SDK patch fixed reconciliation.
-Final-artifact qualification reproduced the failure and isolated missing reverse
-capture metadata. The native capture-rooted list/queue queries address that observed
-application assumption; the final unchanged offline suite passes all 12 cases.
 
-One backup/restore run had 71 passes and one page-context failure because a
-concurrent library packaging command caused Vite to reload the fixture. After
-packaging finished, the unchanged isolated suite passed all 72 functional cases.
-Earlier listener restrictions were resolved using disposable listener access.
-Neither environment correction is reported as a product fix.
+### Hosted CI and previews
 
-Historical-store harness qualification exposed its obsolete private
-`dist/upgrade/index.js` import. The replacement invokes each SDK's native
-`schema compile` and compares the complete results; it does not invent a hash
-model or rewrite migration history. Retained-reader qualification also exposed
-a forced SQLite blob setting. The reader now preserves `files`/SQLite mode,
-including the native rule that no blob-store record means SQLite, and refuses
-unsupported external/custom blob layouts before opening them.
+All 33 [PR checks](https://github.com/delightful-labs/delightful-labs/pull/56/checks)
+passed on `683dc411`: Finance's 18 jobs, Clipper's six and Foundation's four, plus
+status/title checks. Clipper's corrected hosted worker job reports 33 worker,
+six handover, 12 offline and two sample-data passes; the same full job passes
+locally. Its previous head failed the immediate saved-row sample; the aggregate
+red check reported that same failure. Source correction `995f80c7` also qualified
+the Finance runtime fixes. Earlier superseded/canceled runs are not counted as
+successful workflows.
 
-The packed application fixture also needed its existing Faker, Better Auth and
-chart dependencies plus the unchanged provider patch and root chart peer
-declarations. Its standalone SvelteKit page adapter now has the correct shallow
-URL type, and its test shell derives the route store reactively. These changes
-correct fixture packaging/types; no product diagnostic or assertion was disabled.
+Protected READY previews for Finance (`dpl_71Uc64c7A4DNjy8j4Jp2uhY9zJgv`, source
+`995f80c7`) and Clipper (`dpl_F489SGH4T4d3Yw1bNNjr44BfzViy`, source `743c6926`)
+use the verified projects in `iad1` and per-project namespace
+`preview-feat-jazz-beta-upgrade-ed86022e`. Private CLI OIDC authentication produced
+native account HTTP 200 and SharedWorker WebSocket 101 responses. Fresh-profile
+Finance account save/reload and Clipper example.com resolve/extract/save/reload
+pass with no page errors or foreign-origin requests. Worker CDP authentication
+must detach after handshake so it does not keep the old broker alive across
+navigation. Temporary profiles were removed; no protection setting or public
+share link was created. These are fresh-profile previews, not hosted recovery.
 
-The following remain unqualified: hosted Vercel production stores, retained user
-browser profiles and complete external chunk-store
-recovery. The known intermittent Finance unknown-save failures remain unresolved,
-although their four original workflows pass unchanged on beta. The real local-store
-comparisons/recovery and disposable browser fixtures qualify their recorded scope;
-they do not establish hosted production or retained-profile recovery.
+### Actual retained-data and recovery evidence
 
-## Implementation backlog
+The user explicitly approved brief local store pause/copy/resume, then selected
+**“Upgrade main; preserve the older store and snapshot.”** Complete captures,
+identity files, WAL/shared-memory/local blobs, integrity manifest and the excluded
+legacy schema/runtime metadata are preserved privately at
+`/Users/matt/Backups/delightful-labs/jazz-beta-2026-11-24-uv60_ng2`.
+Only scratch copies were opened with beta. Original bytes matched before/after;
+Finance and older Clipper resumed after 34 ms and 33 ms pauses. Current-main
+Clipper was captured closed under a native-compatible OS lock.
 
-| Order | Work | Completion evidence |
-| --- | --- | --- |
-| B1 | Design the smallest supported Jazz integration: adopt native gateway/account semantics; preserve worker ownership with the minimum browser host, then assess extension flow, proof renewal and retry. Trace each proposed retained constraint to a product need rather than an old patch/test. | Reviewed architecture and behavior changes, removal candidates, and concrete evidence for any remaining SDK limitation. |
-| B2 | Prepare the beta integration on an isolated feature branch/worktree; update the four manifests, native pin, root patch/peer configuration and lockfile coherently. Update fixture auth modes and add the two explicit regions. | Diff shows only necessary compatibility work; generated schema/migration identity and native dependency versions are recorded. |
-| B3 | Review the concrete implementation before adding/running its implementation tests, following the workspace test gate. | Reviewed SDK/app changes and the exact selected regression cases. |
-| B4 | Qualify shared integration, then Finance and Clipper including extension. | Matching SDK/Wasm/native/broker artifacts, packed consumers, actual persistent offline browser restarts, identity preservation, native expiry/retry, close/cancellation, valid new-device gateway admission, invalid-proof refusal, new/old build handover and permission isolation. Obsolete implementation-specific expectations are replaced. |
-| B5 | Rehearse retained-store upgrade and recovery on disposable copies; verify preview destinations. | Exact row/amount/audit/attachment comparisons; recovery demonstrated without relying on deployment promotion. No original data modified. |
-| B6 | Review rollout evidence and obtain production deployment authorization. | Same production namespace, app identity and region; coordinated backend/browser/extension compatibility and explicit recovery procedure. |
+| Input | Observed result and scope |
+| --- | --- |
+| Current-main Finance store | Same identity, 29 tables/37 rows and all four audit values match alpha.67/beta.1. No binary cells. Beta probe write/reopen and fresh alpha snapshot restore pass. |
+| Current-main Clipper store | Same identity, 22 tables/28 rows, audit values and three binary cells/121,582 bytes match. Beta probe write/reopen and fresh alpha snapshot restore pass. |
+| User's latest Downloads export | `finance-backup (4).dlf`, November 7, 2026, 3,344,779 bytes. User states no data changes since export. Native envelope integrity and Finance v2 graph validation pass. Actual worker-owned Restore Workspace UI preserves all 619 records: 542 transactions, 22 accounts, 16 categories, eight transfers, ten tags, 20 links and one workspace. Original payload/history bytes match, including the 1,118,293-byte embedded history attachment. Full browser restart and another restart offline with HTTP cache cleared preserve the rows and new identity. No page errors/foreign requests; source file unchanged and temporary profiles/copies removed. |
+| Native mixed-version Finance clients | Alpha.67 and beta.1 concurrently exchange exact fields/audit values through a beta core, reconcile an offline edit and refuse writes after revocation. Backend users, separate device accounts and beta opening alpha's unchanged opaque AccountStore pass. Revocation-negative control fails. This does not qualify Clipper's full mixed-version graph, a persistent alpha browser or installed extensions. |
 
-Current progress: B1–B2 are implemented, including native account behavior and
-the minimal worker/recovery patch supported by actual negative controls. B3's
-continued implementation/verification is authorized by the user's subsequent
-instructions. B4 passes the selected local suites, including actual schema-driven
-handover in both apps, native capture-metadata arrival, persistent offline restart
-and restored-profile reconciliation, and packaged extension checks. B5's
-current-main local-store comparisons and snapshot recovery are complete with
-explicit snapshot authorization. Preview project/namespace/region, private worker
-transport and fresh-profile save/reload checks pass. Production destinations,
-original-profile upgrades and external chunks remain open. The user's actual
-Finance export also passes worker-owned restoration, exact data/history comparison
-and cold offline reopening; this provides a separate verified recovery route.
-The user explicitly
-excluded the older annotations store's migration. B6 has not started; production deployment
-is not authorized.
+The export restore intentionally creates new row IDs, owner membership and current
+Jazz audit values, while preserving original attribution/history as inert source
+bytes. It provides a verified Finance recovery route without locating an old
+browser, not old sign-in credential recovery or an original-profile upgrade.
+No live restoration destination was changed. The localhost test app and its
+in-memory data were discarded. LAN exposure was rejected; the accepted rehearsal
+used only `127.0.0.1`.
 
-The implemented update-handover path uses these existing owners:
+Recovery selects the snapshot's actual baseline SDK, compares candidate data
+before writing, verifies a committed probe after reopen, and restores a fresh
+untouched copy. A modified store is refused as a restored snapshot. Beta-created
+preview data requires beta-to-beta recovery; an older deployment is not rollback.
+Default file and SQLite blobs pass; unsupported external/custom layouts and
+missing chunks are refused. No original store or profile is opened under beta.
 
-| Owner | Selected event and progression | Completion/failure rule |
-| --- | --- | --- |
-| Finance application worker | SDK `onNewerBuild` reports an update intent to the application machine; reuse its CLOSE → domain drain → session/account-store/broker close progression. | Request Window reload only from acknowledged clean completion; failure stays visible. |
-| Clipper realm host | SDK callback reports update intent to the host; reuse SHUTDOWN → application/surface drain → acquisition settlement → session/store/broker close. | Publish reload only after the host's clean terminal result, including extension-host consumers. |
-| Window | Perform the selected reload effect and keep a per-build loop marker in session storage. | An unchanged cached old build must not reload indefinitely; the SDK's Window-only default cannot be invoked from the application worker. |
+The excluded annotations worktree uses alpha.60 at `d2f21c8f`. Alpha.67 refuses
+its disconnected migration graph; beta's native migration diff refuses its
+required/optional `notes.documentId` change. Highlight relations also differ.
+A future upgrade needs a separately scoped staged additive/data-copy migration,
+not an invented history edge or reset. The user selected preservation. See
+[native migration rules](https://github.com/garden-co/jazz/blob/c73bed9a4e868071f10de490ae3f753f3081772f/crates/jazz-codegen/src/migrations.rs).
 
-Keep update intent in the owning machine, preserve identity/binding correlation,
-and refuse new domain work during release. Do not reload directly in the SDK
-callback or hide shutdown orchestration in a promise. The owner handlers accept
-update intent only while running/accepting, record
-the old worker build in machine context, and reuse existing close events. Nine
-dedicated owner/effect cases pass, covering acknowledged/failed/competing close
-and reload-loop/failure behavior. Twelve additional actual schema-driven browser
-cases pass across both apps and all three engines, including cached-old-build
-loop prevention and data preservation through native release/reload.
-These fixtures use two schema-ordered beta builds. They do not establish live
-alpha/beta application-worker coexistence or rollout of a retained user browser
-profile. The separate native wire/account-store evidence below covers a narrower
-mixed-version path; browser/extension rollout remains unqualified.
+### Investigation scope and reproducibility
 
-Remaining release work:
+The completed archive, mixed-version and recovery investigations do not require
+new permanent operator programs in the upgrade PR. Their results remain above;
+the exact programs and full run record remain in the
+[qualified investigation commit](https://github.com/delightful-labs/delightful-labs/tree/683dc4113bfadac81361a88bfd70cc82578522bb/apps/finance/tests/worker-upgrade)
+and its [spec record](https://github.com/delightful-labs/delightful-labs/blob/683dc4113bfadac81361a88bfd70cc82578522bb/specs/005-jazz-beta-upgrade/spec.md).
+The final diff removes `backup-file.mjs`, `mixed-version.mjs` and
+`retained-recovery.mjs` (759 lines) and restores the archive fixture's original
+contract. CI-backed native handover, direct bug regressions, existing upgrade
+fixtures and the shipped broker's reproducibility verifier remain maintained.
+No runtime requirement is removed to reduce the diff.
 
-1. Qualify hosted production and preview destinations on authorized complete
-   snapshots, including every external chunk, and rehearse their recovery without
-   relying on an older deployment/core. Local file/SQLite recovery is complete.
-2. Qualify the selected user recovery route and coordinated backend/browser/extension
-   rollout. The user's unchanged Finance export now passes actual worker-owned
-   restoration and cold offline reopening, as recorded below; locating an uncertain
-   old browser is no longer a prerequisite for that recovery path. Original-profile
-   upgrade remains untested. Choose existing-identity upgrade versus a new restored
-   workspace explicitly before changing the user's live environment.
-3. Preserve Finance's existing unknown-outcome protections and failure diagnostics.
-   The four original workflows have passed on beta without retries; keep the
-   intermittent issue open for actual error evidence rather than repeating green
-   runs or inferring a fix.
-4. Review deployment compatibility, same namespace/identity/region and the complete
-   recovery evidence before requesting production authorization. Migrating the
-   excluded alpha.60 annotations experiment requires separately scoped work.
-
-### Hosted PR qualification and corrections
-
-Draft [PR #56](https://github.com/delightful-labs/delightful-labs/pull/56) was
-opened from `feat/jazz-beta-upgrade` at `743c6926`, after the user's explicit
-commit/push/draft-PR authorization. Main was fetched again and remains `9344dff2`.
-The first hosted runs passed all Foundation and Clipper jobs, including Local
-First consumers/browser qualification, UI, website, Clipper web, packaged
-extension, workers/offline/sample data and tooling. Finance's types/unit/build,
-PWA, restore, feature flags, authentication, permissions, application-1 and
-presentation passed. Application-2 failed two unlink-feedback assertions;
-startup failed one stalled-connection save; workspace failed three account cases.
-These failures remain qualification evidence, not green checks inferred from
-local runs. The original artifacts were retained and inspected before changes.
-
-The stalled-connection test reproduced with its unchanged 15-second success
-assertion. Temporary stage-only diagnostics showed the edit stopped at its
-transaction reads, before commit. Beta's published `ReadTierOptions` and
-`resolveEffectiveQueryExecutionOptions` document a five-second initial remote
-preference for implicit browser reads; explicit `local-first` reads default to
-zero initial remote wait. The ordinary save's transaction-local edit/tag/check
-reads now select this supported option explicitly. See the
-[pinned SDK read-option lowering](https://github.com/garden-co/jazz/blob/c73bed9a4e868071f10de490ae3f753f3081772f/packages/jazz-tools/src/runtime/client.ts).
-Transaction ownership, eligibility checks, atomic writes, local durability and
-later rejection tracking are unchanged. The original stalled-connection scenario then passed, as did its
-17 persistence unit cases. The complete seven-case production-startup suite also
-passes, including full browser restart, silent established/new connections,
-offline saves, later authority rejection and retained bank history. No SDK patch
-or timeout increase was introduced.
-
-The unlink artifacts showed the transaction already unlinked and the suggestions
-panel absent. Its existing machine retained `transferSaved`, but the component
-hid the panel whenever the editor became `unselected`. Keep the machine's
-selected feedback visible even after linked-only controls disappear. Both
-original failing browser scenarios pass with their success and persistence
-assertions intact. No new copy or domain state was added.
-
-Account permissions passed sequentially, then reproduced a timeout under the
-hosted two-worker setting. Full sanitized machine diagnostics distinguish the
-expected member `partial/profileLink` assessment from an SDK exception: all
-three record counts were one and no error was present. The shared selection
-helper always dispatched `selectOption`, including an already-selected workspace,
-then accepted an already-matching URL without waiting for the resulting history
-commit. It now avoids that artificial same-value change event and, when a change
-is needed, waits for its actual main-frame navigation commit. The unchanged five
-permission scenarios pass with two workers, as do all 55 cases in the complete
-workspace scope. All 1,849 Finance unit/native cases pass again with disposable
-listener access. A sandboxed run could not bind its native fixture listeners;
-it was stopped and diagnosed before the permitted run. This does not establish
-a cause for every earlier save or browser teardown failure. Account cases retain
-sanitized diagnostic attachments.
-
-Both Vercel deployments are READY previews for the exact PR head and verified
-project/team. Runtime logs show `iad1` and native namespace
-`preview-feat-jazz-beta-upgrade-ed86022e`, separate per project. Existing private
-CLI OIDC authentication supplies the documented Trusted Sources header. The
-connector's share-link operation was rejected by automatic approval review
-because it would grant publicly shareable access; no such link was created and
-no protection or Trusted Sources setting was changed. The installed native CLI
-misparsed `env run` child arguments, so its installed JavaScript CLI was used.
-Fresh disposable browser profiles and origin-restricted requests were used.
-
-Browser context headers did not reach Jazz's SharedWorker WebSocket: observed
-handshakes returned protection's 302 while account HTTP responses were 200.
-Applying the same private authentication to the verified same-origin worker via
-CDP produced 101 handshakes, Finance's Overview and Clipper's Saved articles with
-`Private library synced.`. Hidden sidebar controls and an incorrect generic
-Library heading were corrected in the temporary verification harness. These were
-harness failures, not app fixes. Keeping a debugger attached also kept the old
-broker alive during a hard navigation and prevented a normal reopen. Detaching
-after the authenticated handshake restored native worker lifetime. With that
-harness correction, a synthetic Finance account save/reload and a Clipper
-example.com capture/reload both passed. Clipper's real resolve/extract API
-responses were 200 and each reopen negotiated a new 101 connection. No page
-exceptions or foreign-origin requests were observed. These preview checks used
-new disposable identities; the profiles were removed. No user browser or
-production store was used. This is hosted startup/transport and fresh-profile
-write/reload evidence, not complete production or retained-profile qualification.
-
-The corrective source commit is `995f80c798fa6794b6efa48a5bb773328cc73b1f`.
-Its Finance preview `dpl_71Uc64c7A4DNjy8j4Jp2uhY9zJgv` is READY in `iad1` for
-`prj_XRyQmkRAdDV2xUZGPeXcFBSfgHVa`; its new disposable identity also passed account
-save and hard reload with three authenticated 101 connections and no page errors.
-Clipper source was unchanged by that commit; its qualified preview remains
-`dpl_F489SGH4T4d3Yw1bNNjr44BfzViy`. Unaffected Clipper/website rebuilds were
-canceled by the existing deployment selector. Current hosted evidence is linked
-from the [PR checks](https://github.com/delightful-labs/delightful-labs/pull/56/checks).
-After that source commit, this spec was reconciled and the test-only diagnostic
-collector was hardened to settle console-handle failures immediately if its
-worker disappears. Product code, dependencies and schemas are unchanged. The
-collector preserves partial diagnostic results without an unhandled rejection.
-Test TypeScript and the five permission cases with two workers pass after that
-test-only change. On the corrective source commit, Foundation and Clipper have
-passed again; Finance's hosted startup and complete workspace scopes also pass.
-All 18 Finance jobs on corrective source `995f80c7` ultimately reported success,
-including the last application-2 shard's 87 cases. The complete same shard also
-passed locally with CI's two-worker setting (87 cases, 2.3 minutes), including
-the original unlink assertions and imported offline edits. The hosted shard took
-11.2 minutes. Its run was superseded and the overall workflow was marked canceled;
-individual job conclusions and logs were verified through both the connector and
-GitHub's API before reporting these passes. A planned cancellation refused that
-already-completed run; only two obsolete documentation-head workflows were
-explicitly canceled. The final head's CI refresh remains separate evidence in
-the linked checks. No canceled or queued check is reported as passing.
-
-Head `1af09e3b` subsequently completed all three hosted workflows successfully:
-Finance (18 jobs), Clipper (six jobs), and Foundation (four jobs), plus PR-title
-checks. This is exact-head hosted evidence, separate from the earlier superseded
-workflow. Main was fetched again and remains `9344dff2`.
-The subsequent native mixed-version fixture head `119df554` also completed all
-three workflows successfully: Finance (18 jobs), Clipper (six jobs), and
-Foundation (four jobs), plus PR-title checks.
-
-### CI correction: wait for saved-row observation after library binding
-
-Head `b40fe5c7` completed Finance and Foundation successfully but failed Clipper's
-worker/offline job. All 33 worker cases and five of six native handover cases
-passed. The Chromium new-document handover failed at the immediate saved-row
-assertion in `tests/worker-handover/native.test.ts:220`. The second red check,
-Account/library/offline browser tests, is the aggregate reporting that same job
-failure; it is not a separate failing scenario. Later offline/sample-data steps
-were not executed after the handover command failed.
-
-The fixture's `ready()` waits for a bound library. The native library machine
-initializes `rows: []` and applies the collection's asynchronous `ROWS` observation
-later; the worker projection can therefore publish the binding before those rows.
-The handover test immediately sampled that intermediate projection. Both the
-reopened document and the already-open descendant document now observe the exact
-original saved article ID using the existing 15-second observation deadline.
-The test retains its one-reload assertion, old-build refusal, both worker-release
-acknowledgements, all six engine/build scenarios and data-identity requirement.
-No application behavior, SDK patch, retry, timeout or CI selection changed.
-
-All six native cases pass with Node 24.22.2 and Clipper's pinned Vitest 4.1.8.
-A native negative control requests a deliberately nonexistent saved-row ID and
-fails at the unchanged 15-second predicate deadline; the original assertion source
-is restored byte-for-byte afterward. Initial local verification encountered an
-undeclared stale web Vitest executable from an earlier fixture environment.
-Frozen installation and removal of that stale shim restore the lockfile-pinned
-Clipper runner; the final six-case pass uses that runner. Workspace links,
-changed-source formatting and lint checks pass. The hosted correction remains
-separate evidence in the [PR checks](https://github.com/delightful-labs/delightful-labs/pull/56/checks),
-and must complete before the latest head is described as green.
-
-### Native mixed-version wire and account-store qualification
-
-The mixed-version investigation uses the existing prepared
-alpha.67/beta.1 Finance readers, their exact current schema and permissions, and
-matching published SDK/native versions. The maintained
-`apps/finance/tests/worker-upgrade/mixed-version.mjs` starts a disposable beta core
-and two separate Node client processes through public `createJazzClient`,
-`localFirst: 'now'`, AccountStore and database APIs. No administrative credential
-is given to a client; the SDK test authority seeds and revokes access.
-
-All three scenarios pass against the unchanged Finance policy:
-
-| Session path | Native identity setup | Observed result |
-| --- | --- | --- |
-| Backend users | Separate users enrolled by the beta test backend; each SDK uses its documented bearer callback. | Both versions remain active, exchange accepted edits and observe identical fields and all four audit values. |
-| Device accounts | Each SDK creates its own device account through the beta gateway, using an explicit test-only memory AccountStore. | Both versions read/write the shared authorized workspace; alpha's offline local edit reaches beta after reconnection. |
-| Retained alpha device account | Beta receives the exact opaque AccountStore record produced by alpha, without a manual metadata or key conversion. | Beta retains alpha's account ID; both active SDKs exchange edits, reconcile the offline edit, and refuse writes after their shared membership is revoked. |
-
-Every scenario verifies global acceptance, an offline edit remaining local until
-reconnection, later cross-version readback and permission refusal without
-changing the stored memo. Removing actual membership revocation makes the native
-negative control fail with `Missing expected rejection`; the passing source is
-restored byte-for-byte afterward. Each SDK session and child process closes and
-the disposable core stops before success is reported. The final three-scenario
-run completes with no remaining fixture process.
-
-The first probe incorrectly supplied a bearer string instead of the documented
-callback and was refused by the SDK. A later fixture-cleanup attempt awaited a
-child `close` notification that did not settle after IPC disconnection; awaiting
-the actual child exit corrected it. These are fixture corrections, not product
-or SDK changes. The probe uses no new dependency, application behavior, SDK patch,
-original store, user browser profile or persisted test key. AccountStore values
-stay opaque and transient; logs contain versions and comparison booleans.
-
-This establishes native wire/account metadata compatibility for the current
-Finance schema with a beta server and these two SDK versions. It does not
-qualify Clipper's full document/blob graph across versions, a persistent browser
-replica, application-worker/broker handover, installed extensions, original user
-profiles or complete hosted/chunk recovery. Those release gates remain open.
-
-The maintained fixture commands run from `apps/finance`:
+Maintained commands, from `apps/finance` unless scoped otherwise:
 
 ```sh
 node tests/worker-upgrade/run.mjs --schema
@@ -925,222 +568,43 @@ node tests/worker-upgrade/run.mjs --worker
 node ../../scripts/jazz/verify-beta-broker.mjs /path/to/jazz-source-checkout
 node tests/worker-upgrade/retained-prepare.mjs /path/to/qualified-finance-artifacts
 node tests/worker-upgrade/retained-prepare.mjs /path/to/qualified-clipper-artifacts --clipper
-node tests/worker-upgrade/mixed-version.mjs /path/to/prepared-finance-readers
 node /path/to/prepared-readers/retained-compare.mjs /path/to/snapshots finance
-node tests/worker-upgrade/retained-recovery.mjs /path/to/finance-readers /path/to/snapshots finance finance
-node tests/worker-upgrade/retained-recovery.mjs /path/to/clipper-readers /path/to/snapshots clipper-main clipper
-node tests/worker-upgrade/inspect-retained-drive.mjs /path/to/read-only-mounts preview
-node tests/worker-upgrade/retained-recovery.mjs /path/to/finance-readers /path/to/copied-preview-snapshots preview finance beta1
-node tests/worker-upgrade/backup-file.mjs /path/to/finance-backup.dlf http://127.0.0.1:6194
+pnpm --dir ../clipper test:worker
+pnpm --dir ../clipper test:offline
+pnpm --dir ../clipper test:extension
 ```
 
-The prepared `retained-compare.mjs` uses separate scratch copies for alpha.67 and
-beta.1, with the same current app and a temporary HMAC key. It prints comparison
-booleans/counts rather than rows, credentials or digests and removes scratch
-copies/key on completion. It requires complete local default-file/SQLite blob
-snapshots; unsupported external/custom layouts are refused. Historical
-alpha.60 compatibility is covered by the independent schema/archive fixtures.
-Preparing readers does not authorize production access or snapshot acquisition.
+Preparing readers does not authorize data acquisition. Existing static, package,
+workspace-link, native-generation and selected application checks retain their
+normal project commands; root defaults target the website.
 
-### Hosted snapshot preparation and explicit recovery baseline
+## Implementation backlog and release gates
 
-Read-only Vercel inventory identifies separate production and preview Drives for
-both verified projects, all in `iad1`. The shared preview environment is
-`preview-feat-jazz-beta-upgrade-ed86022e`; each project's native Drive name is
-truncated and hashed independently. The reported 1 GiB is maximum capacity, not
-measured data usage. No production core was resumed, stopped, mounted or opened.
+| Order | Status | Required evidence |
+| --- | --- | --- |
+| B1 | Implemented | Native account/lifecycle behavior; every residual worker/origin/proof patch tied to a demonstrated limitation. |
+| B2 | Implemented | Coherent beta dependencies, native pins, schemas, identities, namespaces and regions. |
+| B3 | Authorized and completed for implemented scope | Reviewed implementation and subsequent explicit instructions to continue implementation/testing. |
+| B4 | Selected checks pass | Shared packed consumers, both apps' native/offline/handover/permission coverage and packaged extension; latest-head CI must resolve. |
+| B5 | Local and fresh-preview scope passes; hosted recovery open | Exact native snapshot comparisons/recovery and actual Finance export restoration pass. Hosted complete-store/chunk recovery remains unqualified. |
+| B6 | Not authorized | Review compatibility, complete recovery and the intended live user destination before merge/production rollout. |
 
-The concrete proposed preview rehearsal uses one disposable Sandbox per app in
-its existing project and region, one vCPU, a five-minute timeout,
-`persistent: false`, no exposed ports and `networkPolicy: 'deny-all'`. The
-installed Sandbox SDK's `Drive.snapshot()` produces a read-only snapshot mount;
-it is distinct from snapshotting/stopping an existing Sandbox. Vercel also
-documents [read-only Drive snapshots](https://vercel.com/changelog/drives-for-vercel-sandbox-are-now-in-public-beta)
-and the subsequent [general-availability release](https://vercel.com/changelog/vercel-drives-is-now-generally-available).
-The new reader would mount only the existing app's preview Drive at
-`/retained/preview`, inspect fixed layout/version metadata, and copy the complete
-capture into disposable scratch space before opening any store with Jazz.
-Cloud credentials stay in the caller, never inside the reader VM. Cleanup must
-stop and discard each reader even after a refusal. The prepared readers include
-matching Linux x64 native addons, so the VM needs no outbound package download.
+Remaining release work:
 
-Automatic approval review rejected the attempted Finance reader creation: it
-would expose potentially sensitive hosted preview data to new cloud compute,
-whereas the user's earlier snapshot authorization covered local stores. No
-Sandbox was created. The user has been asked to approve this exact preview-only
-procedure for both apps. Production snapshot acquisition remains separately
-unauthorized; there is no attempt to route around the rejection through the SDK
-or a Drive fork. The original-profile rehearsal was pending browser identification;
-the user's subsequent backup-based recovery path is recorded below. No original
-profile has been opened or copied.
-
-The preview stores already run beta, so alpha.67 cannot silently stand in for
-their pre-rehearsal baseline. `retained-recovery.mjs` now accepts an explicit
-`alpha67` or `beta1` final argument (default `alpha67` preserves the approved local
-procedure). It validates the installed SDK version and compares every row,
-audit field, byte value and application identity under the candidate before
-making its synthetic write. It then verifies that write after reopen and restores
-a fresh copy of the original snapshot with the selected baseline. Success reports
-both SDK versions. It never treats an older deployment or a downgrade of the
-modified store as recovery.
-
-On Node 24.22.2, the strengthened alpha.67-to-beta.1 procedure passes again on
-both approved main-store snapshots with exact pre-write comparisons, committed
-probe reopen, exact restored comparisons and unchanged snapshot bytes. A separate
-disposable Finance fixture containing binary attachment data was opened and
-written by beta, then passed beta-to-beta recovery. The inspector accepts an
-explicit `preview` destination and refuses external/custom blob layouts and
-paths outside the snapshot root; an unknown recovery baseline is also refused.
-These refusal controls pass. A native negative control deliberately attempted to
-restore the modified probe store instead of the untouched snapshot; exact restored
-data comparison refused it. The source was restored byte-for-byte afterward.
-Mismatch errors report fixed failure descriptions without dumping private HMAC
-comparison values or file fingerprints. The temporary qualifier initially parsed
-native store logging as JSON; selecting the final summary line corrected that harness
-error. All final checks used the pinned Node version. Scratch stores and keys
-were removed. These are local tooling checks, not hosted recovery evidence.
-
-The proposed cloud capture must still establish its actual blob descriptor and
-complete chunk coverage. Current app configuration and a successful fresh-profile
-save do not establish the contents or recoverability of an existing Drive.
-
-### User-provided Finance export and verified browser recovery
-
-The user could not identify a working old browser and instead identified a recent
-Finance backup in Downloads, stating that the data has not changed since that
-backup. Of five matching files, the newest is `finance-backup (4).dlf`, modified
-November 7, 2026 at 20:35 local time, with 3,344,779 bytes. Its released envelope
-is version 1, containing a Finance workspace profile version 2 payload. The native
-envelope machine verifies integrity and the current Finance validator accepts
-the complete graph and embedded history. No password was required.
-
-The archive contains 619 financial records: 542 transactions, 22 accounts,
-16 categories, eight transfers, ten tags, 20 transaction-tag links and one
-workspace. Its one archive attachment contains 1,118,293 bytes of embedded source
-history; there are no financial file records in this particular archive.
-
-`apps/finance/tests/worker-upgrade/backup-file.mjs` is an opt-in real-file
-rehearsal against an already prepared disposable localhost E2E app. It accepts
-the archive path and local origin, uses a fresh temporary browser profile and
-private working copy, and drives the actual Restore Workspace → review → Create
-Workspace → Open Workspace UI. Restoration and Jazz sessions stay in the
-existing application worker. The read-only worker fixture now accepts an explicit
-restored workspace ID and read tier, retaining the original synthetic-name and
-Remote-tier defaults for existing tests.
-
-The actual Downloads archive passes these checks on beta.1 and Node 24.22.2:
-
-- Every restored business field and relationship matches all 619 original
-  records after reversing the restore plan's new IDs and owner mapping, including
-  every integer transaction amount, account/category/tag link and transfer.
-- The retained original payload matches byte-for-byte, including its source
-  attribution and complete embedded history attachment.
-- The new workspace is active with its intended single owner membership. A full
-  browser-process restart preserves the new identity, every restored row and
-  the exact retained source payload.
-- A second full process restart, with HTTP cache cleared and the browser offline,
-  loads the public shell from the service worker and reads the same rows and
-  source bytes through native LocalFirst queries. No page exception or attempted
-  foreign-origin request is observed.
-- The Downloads file remains byte-identical. Temporary profiles, archive copies,
-  planning resources and generated qualification modules are removed after success.
-  No financial row values, names, amounts, account IDs or digests enter Git or
-  public test output. Failure details remain in the private temporary directory.
-
-The reusable command also refuses missing arguments, nonlocal origins and origins
-with a path before opening a file. It uses current compiled public backup APIs
-and the existing SDK's esbuild; no new dependency or application behavior is
-introduced. The application build, test TypeScript and changed-source formatting
-pass. Both original synthetic v1/v2 restore tests also pass, retaining their
-default workspace selection and Remote-tier assertions.
-
-An initial attempt to start the reader app on `0.0.0.0` was rejected by automatic
-approval review because it would expose an app handling private financial data
-to the LAN. No server started from that attempt. The accepted alternative bound
-only `127.0.0.1:6194` in its own named tmux session, with ephemeral in-memory Jazz
-storage. All original servers, stores and browser profiles remain untouched.
-
-This establishes a recovery route for the user's actual Finance workspace without
-requiring them to identify an old browser. The released restore intentionally
-creates new row IDs, owner membership and current Jazz audit records, while
-retaining the original source attribution/history as immutable archive bytes.
-It does not recover an old sign-in credential or qualify an original-profile
-upgrade. The live restoration destination has not been changed. Hosted preview
-snapshot approval, production data qualification and production authorization
-remain separate; this user message did not approve the pending cloud snapshot
-procedure. All three CI workflows also completed successfully on prior tooling
-head `91ed9018`; subsequent qualification changes require their own CI result.
-
-### Approved and completed local retained-data rehearsal
-
-The user explicitly approved briefly pausing Finance on 5173 and Clipper on 5188,
-capturing their complete local stores and immediately resuming them. The user then
-selected: **“Upgrade main; preserve the older store and snapshot.”** This excludes
-the separately running alpha.60 annotations worktree from migration.
-
-Read-only listener/file-descriptor inspection identified these stores on November
-24. The Finance listener on 5186 held no native store and was untouched.
-
-| App | Live listener / observed PID | Source | Observed size |
-| --- | --- | --- | --- |
-| Finance | 5173 / 84804 | `/Users/matt/Projects/delightful-labs/apps/finance/.jazz/alpha60/finance` | 8 files, 5,357,202 bytes |
-| Older Clipper annotations | 5188 / 8023 | `/Users/matt/Projects/delightful-labs-clipper-annotations/apps/clipper/apps/web/.jazz/alpha60/clipper.sqlite` | 8 files, 5,197,409 bytes |
-| Current-main Clipper | Closed store; native-compatible lock held during capture | `/Users/matt/Projects/delightful-labs/apps/clipper/apps/web/.jazz/alpha60/clipper.sqlite` | 6 files, 1,630,338 bytes |
-
-The capture helper verified PID birth/cwd/store ownership, refused already-stopped
-processes, confirmed suspension and copied the complete store, WAL, shared-memory,
-identity and local blob files into private directories. Before/copy/after bytes
-matched. A `finally` resume and independent timeout/disconnect watchdog were
-qualified against a disposable writer, including helper termination. Actual pauses
-were 34 ms for Finance and 33 ms for the older Clipper process. Both resumed and
-their listeners were verified. Current-main Clipper was captured while closed,
-under its native-compatible exclusive OS lock without opening the original with
-an SDK. No server was terminated/restarted and no namespace/configuration changed.
-
-Only independent scratch copies were opened for comparison/recovery. Current-main
-Finance and Clipper passed the exact comparisons and recovery in the table above.
-The recovery procedure committed a synthetic beta row, verified it after reopen,
-then restored a fresh copy of the untouched snapshot under alpha.67 and compared
-identity, every row/audit field and binary bytes. It did not attempt a downgrade
-of the upgraded directory. Temporary comparison keys and scratch stores were removed.
-Captured snapshots remained byte-identical. No original store was opened with beta.
-
-Complete captures and comparison/recovery results are preserved outside the repo:
-`/Users/matt/Backups/delightful-labs/jazz-beta-2026-11-24-uv60_ng2`.
-The private directory contains `finance`, `clipper-main` and
-`clipper-alpha60-annotations`, plus a manifest recording source, SDK, main commit,
-scope decision and store-tree integrity checksums. The legacy folder also preserves
-its exact schema snapshot, bundled app/permissions and alpha.60 dependency metadata.
-No private rows, credentials or comparison digests were printed or added to git.
-This fulfills the [testing guide](../../docs/engineering/testing.md)'s preservation
-requirement within the user's explicit snapshot authorization.
-
-### Excluded older annotations store
-
-The separate annotations worktree runs alpha.60 at
-`d2f21c8fc772071969dd57c7b7551c90488746e7`. Its schema root
-`364d90a798f1f95152c905ce4478cfa0cf5e6acea7cf98fc33c4c2b3a6fcc63d`
-is disconnected from current main's
-`8a5130d42577e05e2062aca65376e44c00cce9203db9c5a1ed806bc9d1967088`.
-The alpha.67 baseline refused its scratch copy with `disconnected_migration_graph`.
-The old root was reproduced from the exact source with its pinned alpha.60 CLI;
-no original source or data was rewritten.
-
-The schemas also differ in `notes.documentId` nullability, highlight tables and
-relations. Beta's native `migrationDiff` on their public schema JSON refuses the
-required/optional column change. Its advice is a staged additive column/data-copy
-migration with old-client compatibility, rather than a direct conversion. See the
-[pinned native migration implementation](https://github.com/garden-co/jazz/blob/c73bed9a4e868071f10de490ae3f753f3081772f/crates/jazz-codegen/src/migrations.rs)
-and [migration-graph validation](https://github.com/garden-co/jazz/blob/c73bed9a4e868071f10de490ae3f753f3081772f/crates/jazz/src/tools/deployment/compatible.rs).
-This finding is baseline-open plus native-diff evidence, not a claimed beta open
-of the legacy store. A guessed history edge or reset was not attempted. Per the
-user's scope decision, the live legacy store and its complete durable snapshot
-remain preserved; a future legacy migration requires its own staged design.
-
-Static/package commands include `pnpm build:libraries`,
-`pnpm monorepo:check-links`, `pnpm dlf:check`, `pnpm finance:check`,
-`pnpm clipper:check`, native Jazz generation checks and packed-consumer checks.
-The selected unit, native backup/restore, Finance application/binding and Clipper
-worker/offline/extension suites have run as recorded above. Root defaults cover
-the website; root lock and
-configuration changes also select the conservative all-project CI.
+1. Acquire authorized complete hosted preview/production snapshots, including
+   external chunks, and rehearse recovery. Read-only inventory found separate
+   project Drives in `iad1`; reported 1 GiB is capacity, not measured usage.
+   Proposed preview-only readers use same-project/region read-only Drive snapshot
+   mounts, ephemeral one-vCPU Sandboxes, five-minute limits, no ports or outbound
+   network, and scratch copies before SDK opens. Automatic approval review refused
+   creation because local-copy approval did not cover hosted data in new compute.
+   No Sandbox was created; this approval remains pending. Production data access
+   is separately unauthorized. Never resume/stop an original core to inspect it.
+2. Review coordinated backend/browser/extension compatibility and choose the live
+   Finance recovery route: retain an existing identity or restore a new workspace
+   from the verified unchanged export. Original-profile upgrade and full Clipper
+   mixed-version/installed-extension rollout remain unqualified.
+3. Preserve unknown-outcome protections and actual error diagnostics. Passing the
+   original save workflows does not resolve every historical intermittent failure.
+4. Obtain explicit merge/production authorization after the namespace, identity,
+   region and recovery review. Preserve the excluded annotations store and snapshot.
