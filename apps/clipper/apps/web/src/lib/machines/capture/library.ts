@@ -1,4 +1,5 @@
 import { createBoundObservationLogic } from 'delightful-local-first/data/observation-workflow'
+import type { ObservationReleaseOutcome } from 'delightful-local-first/data/observation-workflow'
 import { publicationCleanupMachine } from '../../annotations/publication-cleanup.js'
 import { annotationsMachine, selectAnnotations } from '../../annotations/machine.js'
 import { documentReadingProgress } from '../../reader/schema.js'
@@ -128,15 +129,18 @@ const actors = {
 	collection: createBoundObservationLogic<
 		LibraryArticle[],
 		LibraryInput | undefined,
-		Extract<LibraryEvent, { type: 'ROWS' | 'LIST_FAILED' }>
+		| Extract<LibraryEvent, { type: 'ROWS' | 'LIST_FAILED' }>
+		| {
+				type: 'COLLECTION_RELEASED'
+				input: LibraryInput | undefined
+				outcome: ObservationReleaseOutcome
+		  }
 	>({
 		observe: (input, publish, failed) => input?.subscribe(publish, failed),
 		observed: (_input, rows) => ({ type: 'ROWS', rows }),
 		failed: () => ({ type: 'LIST_FAILED' }),
-		disposalFailed: (input, error) => {
-			if (!input?.reportDisposalFailure) throw error
-			input.reportDisposalFailure(error)
-		}
+		disposalFailed: (input, error) => input?.reportDisposalFailure?.(error),
+		released: (input, outcome) => ({ type: 'COLLECTION_RELEASED', input, outcome })
 	}),
 	worker: createCallbackLogic<QueueControl, LibraryCapability | undefined>(
 		({ input, receive, sendBack }) => {
@@ -190,12 +194,16 @@ export const libraryMachine = setup({
 			RETRY: types<EventPayload<Event, 'RETRY'>>(),
 			ROWS: types<EventPayload<Event, 'ROWS'>>(),
 			LIST_FAILED: types<EventPayload<Event, 'LIST_FAILED'>>(),
+			COLLECTION_RELEASED: types<{
+				input: LibraryInput | undefined
+				outcome: ObservationReleaseOutcome
+			}>(),
 			CAPTURE_SAVED: types<EventPayload<Event, 'CAPTURE_SAVED'>>(),
 			WATCH_RECEIPTS: types<EventPayload<Event, 'WATCH_RECEIPTS'>>()
 		},
 		internalEvents: { CAPTURE_UPDATED: types() },
 		input: types<LibraryInput | undefined>(),
-		output: types<undefined>(),
+		output: types<{ outcome: 'released' | 'unresolved' }>(),
 		meta: types<Meta>(),
 		tags: types<string>(),
 		children: {
@@ -329,7 +337,10 @@ export const libraryMachine = setup({
 					)
 				)
 					return
-				return { target: 'closed' }
+				if (matchesState({ running: { collectionLifecycle: 'released' } }, args.value))
+					return { target: 'closed' }
+				if (matchesState({ running: { collectionLifecycle: 'unresolved' } }, args.value))
+					return { target: 'unresolved' }
 			},
 			on: {
 				ANNOTATION: (args, enq) => {
@@ -934,6 +945,29 @@ export const libraryMachine = setup({
 						closed: {}
 					}
 				},
+				collectionLifecycle: {
+					initial: 'active',
+					states: {
+						active: {
+							on: {
+								SHUTDOWN: (_args, enq) => {
+									enq.sendTo('collection', { type: 'RELEASE' })
+									return { target: 'releasing' }
+								}
+							}
+						},
+						releasing: {
+							on: {
+								COLLECTION_RELEASED: ({ context, event }) => {
+									if (event.input !== context.capability) return
+									return { target: event.outcome === 'released' ? 'released' : 'unresolved' }
+								}
+							}
+						},
+						released: {},
+						unresolved: {}
+					}
+				},
 				control: {
 					initial: 'active',
 					states: {
@@ -1342,8 +1376,11 @@ export const libraryMachine = setup({
 				}
 			}
 		},
+		// Preserve the original capability as custody evidence after an unresolved native release.
+		unresolved: { type: 'final', output: { outcome: 'unresolved' } },
 		closed: {
 			type: 'final',
+			output: { outcome: 'released' },
 			entry: () => {
 				return {
 					context: {

@@ -851,8 +851,11 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 															self.send({ type: 'LIBRARY_DISPOSAL_FAILED' })
 													}),
 													onDone: (args) => {
-														if (!args.context.clean)
-															return { target: '#application-active-flow-running-draining' }
+														if (!args.context.clean || args.event.output.outcome !== 'released')
+															return {
+																target: '#application-active-flow-running-draining',
+																context: { clean: false }
+															}
 														if (args.guards.libraryStoppingFor(args, 'restore'))
 															return { target: '#application-active-flow-running-restoring' }
 														if (args.guards.libraryStoppingFor(args, 'logout'))

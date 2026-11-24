@@ -443,3 +443,20 @@ failure retains unresolved custody, blocks native client closure and cannot admi
 a replacement. Shared-owner admission must disappear before the existing capture,
 reader, image, search and write descendants receive shutdown. Their issued work
 remains bound to the original resources until real settlement.
+
+### Explicit Clipper library release receipt
+
+The collection now opts into DLF's existing explicit `RELEASE` protocol. A
+parallel collection lifecycle owns active → releasing → released/unresolved;
+only the original capability's receipt is consumed after shutdown. Repeated
+shutdown does not reissue disposal. The library's existing domain drain join
+also waits for that lifecycle. Terminal output distinguishes `released` from
+`unresolved`; unresolved output retains the original capability as custody
+evidence. Application readiness requires the released output as well as its
+existing clean-host fact before restore, replacement or clean closure.
+
+Acquisition or disposal failure cannot become a clean receipt, including when
+the optional account diagnostic callback is absent. This reuses the same shared
+observation implementation and receipt outcome as Finance queries. The native
+resource owner integration remains the next step; the current readiness host
+still supplies account-level cleanup reporting and owns native client closure.

@@ -939,3 +939,30 @@ including two new real-policy fixture cases: unknown empty-root evidence becomes
 allowed after actual local persistence without a startup report, and a different
 explicit target never falls back to an existing identity root. Full coordinator,
 web, service-worker and extension type checks pass with zero Svelte diagnostics.
+
+## Clipper explicit collection release receipt
+
+The production library now opts into the existing DLF observation `RELEASE`
+protocol. Its collection lifecycle consumes only the original capability's
+receipt after shutdown, then joins that receipt with the existing domain drains.
+Repeated shutdown issues one disposal. Terminal output is explicitly released or
+unresolved; unresolved output retains the original capability. The readiness host
+requires the released output before restoring, replacing or closing cleanly.
+This reuses Finance's observation receipt semantics without adding a second
+resource-disposal implementation.
+
+All 1,016 Clipper unit tests across 154 files and full coordinator/web/service-
+worker/extension type checks pass. Tests cover missing and unrelated receipts,
+failure without an optional diagnostic callback, subscription acquisition failure, exactly-once
+disposal and held writes that outlive collection release. All 38 native browser
+cases pass: 22 account cases, the complete 12-case production offline suite, one
+populated-startup case and three extension offline/restoration/teardown cases.
+Both offline production builds and the extension build pass.
+
+The first development browser run remained waiting when a stale isolated
+Vite cache supplied the pre-receipt DLF observer. Inspection confirmed the cached
+bundle lacked `RELEASE` handling while the installed package contained it.
+Removing only this worktree's generated cache produced the passing cold 22-case
+run; no receipt gate, assertion or timeout was weakened. Production bundles use
+the current implementation and pass separately. Shared lease adoption remains
+open and follows this qualified terminal-receipt boundary.

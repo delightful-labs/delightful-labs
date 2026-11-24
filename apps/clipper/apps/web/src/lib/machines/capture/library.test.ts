@@ -1,7 +1,7 @@
 import { fixtureReaderDocument, fixtureAttachment } from '../../capture/fixtures.test-support.js'
 import { controlledSave, testLibraryCapability } from './library.test-support.js'
 import { expect, it, vi } from 'vitest'
-import { createActor, toPromise, waitFor } from 'xstate'
+import { createActor, createCallbackLogic, toPromise, waitFor, type InputFrom } from 'xstate'
 import { libraryMachine, selectLibraryView, selectLibraryCaptureView } from './library.js'
 import type {
 	ArticleSaveResult,
@@ -59,7 +59,7 @@ it('publishes collection values and reports synchronous subscription failure thr
 	try {
 		expect(actor.getSnapshot().context.rows).toEqual([row])
 		actor.send({ type: 'SHUTDOWN' })
-		await toPromise(actor)
+		expect(await toPromise(actor)).toEqual({ outcome: 'released' })
 		expect(unsubscribe).toHaveBeenCalledOnce()
 	} finally {
 		actor.stop()
@@ -75,7 +75,7 @@ it('publishes collection values and reports synchronous subscription failure thr
 		expect(failed.getSnapshot().context.listFailed).toBe(true)
 		expect(failed.getSnapshot().context.rows).toEqual([])
 		failed.send({ type: 'SHUTDOWN' })
-		await toPromise(failed)
+		expect(await toPromise(failed)).toEqual({ outcome: 'unresolved' })
 	} finally {
 		failed.stop()
 	}
@@ -101,13 +101,69 @@ it('reports the exact native collection disposal failure to its account host bef
 	actor.start()
 	try {
 		actor.send({ type: 'SHUTDOWN' })
-		await toPromise(actor)
+		expect(await toPromise(actor)).toEqual({ outcome: 'unresolved' })
 		expect(report).toHaveBeenCalledExactlyOnceWith(error)
 		expect(order).toEqual(['failure', 'completed'])
 		expect(dispose).toHaveBeenCalledOnce()
 	} finally {
 		actor.stop()
 	}
+})
+it('waits for the original collection receipt and ignores an unrelated release report', async () => {
+	const capability = testLibraryCapability(candidate)
+	let release: (() => void) | undefined
+	const shutdown = vi.fn()
+	const logic = libraryMachine.provide({
+		actors: {
+			collection: createCallbackLogic<{ type: 'RELEASE' }, InputFrom<typeof libraryMachine>>(
+				({ input, receive, sendBack }) => {
+					receive(() => {
+						shutdown()
+						release = () => sendBack({ type: 'COLLECTION_RELEASED', input, outcome: 'released' })
+					})
+				}
+			)
+		}
+	})
+	const actor = createActor(logic, { input: capability }).start()
+	try {
+		// A report before shutdown cannot replace the eventual native receipt.
+		actor.send({ type: 'COLLECTION_RELEASED', input: capability, outcome: 'released' })
+		actor.send({ type: 'SHUTDOWN' })
+		actor.send({ type: 'SHUTDOWN' })
+		expect(shutdown).toHaveBeenCalledOnce()
+		expect(actor.getSnapshot().status).toBe('active')
+		expect(actor.getSnapshot().output).toBeUndefined()
+		actor.send({
+			type: 'COLLECTION_RELEASED',
+			input: testLibraryCapability(candidate),
+			outcome: 'released'
+		})
+		expect(actor.getSnapshot().status).toBe('active')
+		if (!release) throw new Error('Missing original release request')
+		release()
+		expect(await toPromise(actor)).toEqual({ outcome: 'released' })
+	} finally {
+		actor.stop()
+	}
+})
+
+it('retains unresolved collection custody even without an account failure callback', async () => {
+	const dispose = vi.fn(() => {
+		throw new Error('Native disposal failed')
+	})
+	const capability = testLibraryCapability(candidate, { subscribe: () => dispose })
+	const actor = createActor(libraryMachine, { input: capability }).start()
+	try {
+		actor.send({ type: 'SHUTDOWN' })
+		expect(await toPromise(actor)).toEqual({ outcome: 'unresolved' })
+		expect(actor.getSnapshot().context.capability).toBe(capability)
+		expect(dispose).toHaveBeenCalledOnce()
+		expect(actor.getSnapshot().can({ type: 'ADD', url: candidate.submittedUrl })).toBe(false)
+	} finally {
+		actor.stop()
+	}
+	expect(dispose).toHaveBeenCalledOnce()
 })
 it('Add Link saves only the URL immediately without a capture preparation phase', async () => {
 	const save = vi.fn(async (): Promise<ArticleSaveResult> => ({
@@ -132,6 +188,8 @@ it('drains a URL write and the worker resource before closing the account scope'
 	actor.send({ type: 'SHUTDOWN' })
 	expect(actor.getSnapshot().status).toBe('active')
 	expect(shutdown).toHaveBeenCalledOnce()
+	expect(unsubscribe).toHaveBeenCalledOnce()
+	expect(actor.getSnapshot().output).toBeUndefined()
 	gate.resolve({ kind: 'unknown', operationId: id })
 	await toPromise(actor)
 	expect(unsubscribe).toHaveBeenCalledOnce()
