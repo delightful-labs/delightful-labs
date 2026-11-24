@@ -3,7 +3,11 @@ import { controlledSave, testLibraryCapability } from './library.test-support.js
 import { expect, it, vi } from 'vitest'
 import { createActor, toPromise, waitFor } from 'xstate'
 import { libraryMachine, selectLibraryView, selectLibraryCaptureView } from './library.js'
-import type { ArticleSaveResult, SaveArticleRequest } from '../../contracts/articles.js'
+import type {
+	ArticleSaveResult,
+	SaveArticleRequest,
+	LibraryArticle
+} from '../../contracts/articles.js'
 const id = crypto.randomUUID()
 const candidate = {
 	id,
@@ -33,6 +37,78 @@ function fixture(
 	const actor = createActor(libraryMachine, { input: cap }).start()
 	return { actor, shutdown, unsubscribe }
 }
+
+it('publishes collection values and reports synchronous subscription failure through the shared observer', async () => {
+	const unsubscribe = vi.fn()
+	const row: LibraryArticle = {
+		id: candidate.id,
+		title: candidate.title,
+		url: candidate.submittedUrl,
+		readable: true,
+		readingProgress: 0,
+		createdAt: '2026-11-23T00:00:00.000Z',
+		failure: null
+	}
+	const cap = testLibraryCapability(candidate, {
+		subscribe: (publish) => {
+			publish([row])
+			return unsubscribe
+		}
+	})
+	const actor = createActor(libraryMachine, { input: cap }).start()
+	try {
+		expect(actor.getSnapshot().context.rows).toEqual([row])
+		actor.send({ type: 'SHUTDOWN' })
+		await toPromise(actor)
+		expect(unsubscribe).toHaveBeenCalledOnce()
+	} finally {
+		actor.stop()
+	}
+	const failed = createActor(libraryMachine, {
+		input: testLibraryCapability(candidate, {
+			subscribe: () => {
+				throw new Error('Collection subscribe failed')
+			}
+		})
+	}).start()
+	try {
+		expect(failed.getSnapshot().context.listFailed).toBe(true)
+		expect(failed.getSnapshot().context.rows).toEqual([])
+		failed.send({ type: 'SHUTDOWN' })
+		await toPromise(failed)
+	} finally {
+		failed.stop()
+	}
+})
+
+it('reports the exact native collection disposal failure to its account host before completion', async () => {
+	const error = new Error('Collection disposal failed')
+	const dispose = vi.fn(() => {
+		throw error
+	})
+	const order: string[] = []
+	const report = vi.fn((failure: unknown) => {
+		expect(failure).toBe(error)
+		order.push('failure')
+	})
+	const actor = createActor(libraryMachine, {
+		input: {
+			...testLibraryCapability(candidate, { subscribe: () => dispose }),
+			reportDisposalFailure: report
+		}
+	})
+	actor.subscribe({ complete: () => order.push('completed') })
+	actor.start()
+	try {
+		actor.send({ type: 'SHUTDOWN' })
+		await toPromise(actor)
+		expect(report).toHaveBeenCalledExactlyOnceWith(error)
+		expect(order).toEqual(['failure', 'completed'])
+		expect(dispose).toHaveBeenCalledOnce()
+	} finally {
+		actor.stop()
+	}
+})
 it('Add Link saves only the URL immediately without a capture preparation phase', async () => {
 	const save = vi.fn(async (): Promise<ArticleSaveResult> => ({
 		kind: 'saved',

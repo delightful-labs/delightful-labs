@@ -537,3 +537,37 @@ it.each(['shutdown', 'replace'] satisfies ('shutdown' | 'replace')[])(
 		expect(f.close).not.toHaveBeenCalled()
 	}
 )
+
+it.each(['shutdown', 'restore', 'replace'] satisfies ('shutdown' | 'restore' | 'replace')[])(
+	'refuses clean native release and continuation after collection disposal fails during %s',
+	async (reason) => {
+		const a = readyAccount('A')
+		const b = readyAccount('B')
+		const dispose = vi.fn(() => {
+			throw new Error('Native collection disposal failed')
+		})
+		const create = a.capabilities.createLibrary
+		const f = fixture({
+			...a,
+			capabilities: {
+				...a.capabilities,
+				createLibrary: (current) => ({
+					...create(current),
+					subscribe: () => dispose
+				})
+			}
+		})
+		await ready(f)
+		if (reason === 'shutdown') f.actor.send({ type: 'SHUTDOWN' })
+		else if (reason === 'restore')
+			f.actor.send({ type: 'RESTORE', phrase: 'valid synthetic phrase' })
+		else f.emit(b)
+		await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+		expect(f.actor.getSnapshot().output).toEqual({ clean: false })
+		expect(selectApplicationView(f.actor.getSnapshot(), true).status).toBe('ownerFailed')
+		expect(dispose).toHaveBeenCalledOnce()
+		expect(f.close).not.toHaveBeenCalled()
+		expect(f.change).not.toHaveBeenCalled()
+		expect(b.capabilities.createLibrary).not.toHaveBeenCalled()
+	}
+)

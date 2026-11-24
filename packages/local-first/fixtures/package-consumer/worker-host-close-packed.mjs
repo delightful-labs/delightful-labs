@@ -7,6 +7,11 @@ import { build } from 'vite'
 
 const consumers = [
 	{
+		name: 'bound-observation',
+		source: 'bound-observation.ts',
+		subpath: 'delightful-local-first/data/observation-workflow'
+	},
+	{
 		name: 'workspace-initialization',
 		source: 'workspace-initialization.ts',
 		subpath: 'delightful-local-first/workspace/initialization'
@@ -132,7 +137,7 @@ try {
 		})
 	}
 	console.log(
-		'Packed workspace-initialization/workspace-startup/workspace-seed/browser-job/callback-custody/close/root-broker/owned-broker consumers: public types, effects/receipts and self-contained ES-module workers passed.'
+		'Packed bound-observation/workspace-initialization/workspace-startup/workspace-seed/browser-job/callback-custody/close/root-broker/owned-broker consumers: public types, effects/receipts and self-contained ES-module workers passed.'
 	)
 } finally {
 	await rm(directory, { recursive: true, force: true })

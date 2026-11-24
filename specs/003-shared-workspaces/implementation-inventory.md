@@ -489,7 +489,7 @@ The first small source extraction below prepares that boundary. It does not
 introduce an unused selector, silently reinterpret route revisions as leases or
 claim that changed observations acknowledge native resource drain.
 
-### Shared observation lifetime (implementation review pending)
+### Shared observation lifetime
 
 Finance's production `worker-queries.ts` contains the callback lifetime used for
 all 15 query subscriptions, including identity, directory and target-access facts.
@@ -505,7 +505,9 @@ admits source values/failures while active, marks callback admission withdrawn
 before calling disposal, and releases the returned subscription. Synchronous
 subscription-construction errors report failure through the same typed path as
 native read failures. Disposal errors use Finance's existing host failure signal;
-Clipper retains its existing thrown-disposal-error behavior. Late source callbacks
+Clipper initially retained its existing thrown-disposal-error behavior. Qualification
+below replaces that insufficient host boundary with Finance's explicit failure
+signal. Late source callbacks
 after disposal cannot publish into the parent. There is no new selection policy,
 session owner, operation supervisor, retry, polling or available-empty fallback.
 
@@ -514,7 +516,8 @@ production consumer bindings. The selection integration design and app integrati
 guide record the boundaries. The identity/access/content-owner split and actual
 selection-lease adoption remain subsequent work.
 
-Review this extraction before adding/running behavior tests. Required checks
+The user's `Make a PR so we can keep track and continue` instruction approved
+continuing qualification of the reviewed extraction. Required checks
 include synchronous/asynchronous publication, absent subscription, startup/read
 failure, late callbacks during/after disposal, exactly-once disposal and disposal
 failure propagation, plus actual Finance query and Clipper collection behavior.
@@ -524,6 +527,46 @@ previous initializer/startup results do not qualify this extraction.
 Review-stage checks passed: both shared libraries packaged with strict publint,
 DLF library checks, full Finance and Clipper web/extension checks (zero errors and
 warnings), both app production builds, workspace peer links, scoped formatting/
-lint and whitespace checks. No behavior tests were added or run for this new
-extraction pending implementation review. These changes remain uncommitted after
-the qualified startup commit.
+lint and whitespace checks. No behavior tests were added or run at that review
+checkpoint. The extraction was subsequently committed as `a2d3479e` and pushed
+with the qualified startup work into [draft PR #55](https://github.com/delightful-labs/delightful-labs/pull/55).
+
+The shared observer tests pass 6 cases, including a 100-run generated callback/
+disposal campaign. The packed consumer passes public types, actual execution,
+and self-contained worker bundling through the published export map. Finance's
+84 production-worker tests pass, including subscription construction failure,
+retired A → B → A callbacks, native read failure and disposal-error refusal.
+
+Clipper qualification exposed a pre-existing host boundary gap: a throw during
+collection callback teardown did not surface as a library-root error. The actual
+account host must receive failure before consuming the library's completion.
+Clipper now supplies that explicit host-failure callback just as Finance does;
+the account owner checks it before continuing restoration or replacement and
+returns an unclean drain instead. The shared observer factory remains unchanged.
+The library's report-before-completion test and all three account-host shutdown/
+restore/replacement failure cases pass. No new product copy or native session
+supervisor was introduced. Current Clipper library/readiness coverage passes
+65 tests. Native browser qualification and final checks follow this change.
+
+Final local qualification passed:
+
+- The complete DLF suite: 1,318 tests. Hosted CI exposed one missed notebook
+  initializer expectation; it now checks the exact successful persistence receipt
+  added by the shared initializer contract. No assertion was weakened.
+- Finance's 84 worker tests and Clipper's 65 collection/readiness tests, plus the
+  packed public observer consumer's types/execution/worker bundle.
+- Finance's 4 production-worker browser cases: cold reads/saves with an unanswered
+  connection, cold offline operation, an established connection that stops
+  answering, and actual permission rejection following local success.
+- Clipper's 8 production offline cases, 3 extension account-convergence cases,
+  populated-startup regression and full 22-case account browser spec. Local
+  account tests retain the original assertions and timeouts.
+- Both app type/Svelte checks, production builds and scoped formatting/lint.
+
+On the initial pushed head, hosted web CI failed 11 account cases, largely at
+the root-sync status assertion. Its focused and full local reproductions passed;
+the hosted cause remains unresolved. CI now retains failure traces and uploads
+the web test-result artifacts, using the existing pinned artifact action. This
+adds diagnostics without changing tests, retries, timeouts or pass criteria.
+The PR stays draft while that hosted qualification and the selection/lease work
+remain open. Hosted results and local qualification must be distinguished.

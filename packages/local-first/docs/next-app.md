@@ -111,6 +111,13 @@ are rethrown. Keep binding/generation in the reports and reject stale reports in
 their owning chart. This adapter does not grant workspace access or acknowledge
 domain-operation drain.
 
+Hosts that certify native closure supply `disposalFailed` to the owner that will
+consume the resource group's completion. Finance and Clipper both use this
+explicit host-failure boundary: callback teardown can occur while its child is
+stopping, so throwing from that callback alone does not certify failed host
+closure. Keep the failure signal ahead of the group's completion and refuse
+clean release or replacement when it has been observed.
+
 Use `issueLocalWrite` and `persistLocal` from the named Jazz boundary where a statechart separates
 issuing a write from observing local durability. A single-write leaf may use its native receipt
 with a local wait. Never claim remote acceptance from that wait. Multi-step read/check/write or

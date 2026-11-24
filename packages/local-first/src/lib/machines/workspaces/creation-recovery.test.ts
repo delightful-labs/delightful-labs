@@ -680,7 +680,8 @@ describe('host-owned initialization projection', () => {
 		expect(await toPromise(actor)).toEqual({
 			outcome: 'ready',
 			identityId: 'a',
-			workspaceId: 'stable-attempt'
+			workspaceId: 'stable-attempt',
+			persistence: { outcome: 'succeeded', settlement: 'locallyPersisted', workspace }
 		})
 		expect(prepareInitial).toHaveBeenCalledOnce()
 		expect(discover.mock.calls).toHaveLength(2)

@@ -44,7 +44,8 @@
 		"./browser-worker-job.ts",
 		"./workspace-seed.ts",
 		"./workspace-startup.ts",
-		"./workspace-initialization.ts"
+		"./workspace-initialization.ts",
+		"./bound-observation.ts"
 	],
 	"exclude": []
 }

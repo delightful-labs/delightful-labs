@@ -58,6 +58,10 @@ type Event =
 	  }
 	| { type: 'WRITE_ERROR'; actorId: string; error: unknown }
 type WriteReport = Extract<Event, { type: 'WRITE_DONE' | 'WRITE_ERROR' }>
+type LibraryInput = LibraryCapability & {
+	/** The account host owns native release and must observe disposal failure before completion. */
+	reportDisposalFailure?: (error: unknown) => void
+}
 type Context = {
 	fakeDataRef: FakeDataRef | undefined
 	organizationRef: SaveRef | undefined
@@ -68,7 +72,7 @@ type Context = {
 	favorites: boolean
 	selectedTags: string[]
 	query: string
-	capability: LibraryCapability | undefined
+	capability: LibraryInput | undefined
 	saveRef: SaveRef | undefined
 	url: string
 	content: ArticleContent | undefined
@@ -123,12 +127,16 @@ const actors = {
 	search: createSearchMachine(),
 	collection: createBoundObservationLogic<
 		LibraryArticle[],
-		LibraryCapability | undefined,
+		LibraryInput | undefined,
 		Extract<LibraryEvent, { type: 'ROWS' | 'LIST_FAILED' }>
 	>({
 		observe: (input, publish, failed) => input?.subscribe(publish, failed),
 		observed: (_input, rows) => ({ type: 'ROWS', rows }),
-		failed: () => ({ type: 'LIST_FAILED' })
+		failed: () => ({ type: 'LIST_FAILED' }),
+		disposalFailed: (input, error) => {
+			if (!input?.reportDisposalFailure) throw error
+			input.reportDisposalFailure(error)
+		}
 	}),
 	worker: createCallbackLogic<QueueControl, LibraryCapability | undefined>(
 		({ input, receive, sendBack }) => {
@@ -186,7 +194,7 @@ export const libraryMachine = setup({
 			WATCH_RECEIPTS: types<EventPayload<Event, 'WATCH_RECEIPTS'>>()
 		},
 		internalEvents: { CAPTURE_UPDATED: types() },
-		input: types<LibraryCapability | undefined>(),
+		input: types<LibraryInput | undefined>(),
 		output: types<undefined>(),
 		meta: types<Meta>(),
 		tags: types<string>(),

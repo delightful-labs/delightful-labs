@@ -175,6 +175,7 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 				RESTORE: types<{ phrase: string }>(),
 				OBSERVED: types<{ observation: AccountObservation; stage: SessionRuntimeView['stage'] }>(),
 				NATIVE_FAILED: types(),
+				LIBRARY_DISPOSAL_FAILED: types(),
 				LIBRARY_BOUND: types<{ binding: AccountBinding }>(),
 				LIBRARY_ADOPTED: types(),
 				WORKSPACE_INITIALIZATION_RESULT:
@@ -274,6 +275,7 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 			}
 		],
 		on: {
+			LIBRARY_DISPOSAL_FAILED: () => ({ context: { clean: false } }),
 			NATIVE_FAILED: (_args, enq) => {
 				enq.raise({ type: 'SHUTDOWN' })
 				return { context: { clean: false } }
@@ -843,8 +845,14 @@ export function createApplicationReadinessMachine(observeConnection?: Connection
 												invoke: {
 													id: 'library',
 													src: 'library',
-													input: ({ context }) => context.adoption?.library,
+													input: ({ context, self }) => ({
+														...required(context.adoption).library,
+														reportDisposalFailure: () =>
+															self.send({ type: 'LIBRARY_DISPOSAL_FAILED' })
+													}),
 													onDone: (args) => {
+														if (!args.context.clean)
+															return { target: '#application-active-flow-running-draining' }
 														if (args.guards.libraryStoppingFor(args, 'restore'))
 															return { target: '#application-active-flow-running-restoring' }
 														if (args.guards.libraryStoppingFor(args, 'logout'))

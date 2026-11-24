@@ -1845,6 +1845,29 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.stop()
 		}
 	})
+	it('reports synchronous subscription construction failure without exposing an empty directory as ready', async () => {
+		const f = fixture()
+		try {
+			await f.start()
+			const next = f.ready({})
+			f.publishSession({
+				...next,
+				capabilities: {
+					...next.capabilities,
+					observeWorkspaces: () => {
+						throw new Error('Native directory subscribe failed')
+					}
+				}
+			})
+			await vi.waitFor(() => expect(f.view().status).toBe('failed'))
+			expect(f.view().workspaces).toBeNull()
+			expect(f.view().accounts).toEqual([])
+			expect(f.createWrite).not.toHaveBeenCalled()
+			expect(f.nativeClose).not.toHaveBeenCalled()
+		} finally {
+			f.stop()
+		}
+	})
 	it('withdraws a failed read and supports a new selected query without replaying any write', async () => {
 		const f = fixture()
 		try {
