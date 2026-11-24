@@ -311,7 +311,7 @@ export function openApplicationClient(input: Input) {
 				authorizePublication: (did) =>
 					post({
 						type: 'ATPROTO',
-						scope,
+						scope: initial.accountScope,
 						handle: did,
 						authorizationScope: 'atproto repo:at.margin.note'
 					}),

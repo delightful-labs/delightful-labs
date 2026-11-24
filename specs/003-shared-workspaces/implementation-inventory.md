@@ -1031,3 +1031,26 @@ disposable authority; source/test types and scoped formatting pass.
 This proves the concurrent missing-root case for Clipper's canonical adapter.
 It does not substitute for partial-replica, unanswered-connection or later
 permission-rejection cases, nor claim all native schedules are explored.
+
+## Identity commands across selected-library changes
+
+Finance profile intents now retain their originating native session scope while
+financial intents retain workspace/lease origin. A parent regression reproduced
+the lost same-identity profile submission after workspace revision changed, then
+verified acceptance and refusal of another session. All 1,856 Finance unit tests,
+source/Svelte/test types and five native profile/permission cases pass.
+
+Clipper account, recovery and OAuth intents now use the existing recovery owner's
+native actor-session identity separately from the selected library UI scope. The
+controlled regression reproduced a recovery HIDE lost during library admission;
+it now also covers invalid restoration, reopening and retired identity refusal.
+Web and extension producers capture the proper identity scope. Worker restoration
+fixtures retain their A → B → A isolation and held native reader-receipt assertions
+while correlating identity recovery with the correct public scope.
+
+Qualification: 1,024 Clipper unit tests across 155 files, 34 UI component tests and
+the final six host-binding regressions pass. All 125 native browser cases pass:
+68 web, 12 packaged extension, 12 production offline and 33 worker cases. Both
+offline production builds and the packaged extension build pass. The UI component
+tests use jsdom; they are not included in the native-browser count. Hosted runs
+remain separately tracked; passing local cases do not close hosted qualification.

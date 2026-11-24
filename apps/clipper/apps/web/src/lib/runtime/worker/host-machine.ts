@@ -44,6 +44,14 @@ function sameRecovery(left: ApplicationBindingFacts, right: ApplicationBindingFa
 		left.recovery?.source === right.recovery?.source
 	)
 }
+export function selectIdentityCommandScope(
+	snapshot: import('xstate').SnapshotFrom<typeof workerHostMachine>
+) {
+	return identityCommandScope(snapshot.context)
+}
+function identityCommandScope(context: Context) {
+	return context.recovery ? required(context.recovery.sessionId) : context.scope
+}
 function required<T>(value: T | undefined): T {
 	if (value === undefined) throw new Error('Worker binding unavailable')
 	return value
@@ -200,7 +208,9 @@ export const workerHostMachine = setup({
 		suppliedRecovery: ({ event }: { event: Event }) =>
 			event.type === 'BIND_RECOVERY' && !!event.binding,
 		currentRecovery: ({ context, event }: { context: Context; event: Event }) =>
-			event.type === 'RECOVERY' && event.scope === context.scope && !!context.recovery,
+			event.type === 'RECOVERY' &&
+			event.scope === identityCommandScope(context) &&
+			!!context.recovery,
 		suppliedLibrary: ({ event }: { event: Event }) =>
 			event.type === 'BIND_LIBRARY' && !!event.library,
 		resettingTags: ({ context, event }: { context: Context; event: Event }) =>
@@ -208,19 +218,8 @@ export const workerHostMachine = setup({
 			event.event.type === 'RESET' &&
 			event.scope === context.scope &&
 			!!context.tagForm,
-		currentAccount: ({
-			context,
-			event,
-			value
-		}: {
-			context: Context
-			event: Event
-			value: import('xstate').StateValue
-		}) =>
-			'scope' in event &&
-			event.scope === context.scope &&
-			!matchesState({ running: { accepting: 'retiring' } }, value) &&
-			!matchesState({ running: { accepting: 'identifying' } }, value),
+		currentAccount: ({ context, event }: { context: Context; event: Event }) =>
+			'scope' in event && event.scope === identityCommandScope(context),
 		currentReader: ({ context, event }: { context: Context; event: Event }) =>
 			event.type === 'ATTACH_BOUND' &&
 			event.scope === context.scope &&
@@ -423,14 +422,14 @@ export const workerHostMachine = setup({
 								handle: args.event.handle,
 								authorizationScope: args.event.authorizationScope
 							})
-							return { context: { oauthScope: args.context.scope } }
+							return { context: { oauthScope: identityCommandScope(args.context) } }
 						},
 						OAUTH_RETURNED: ({ context }, enq) => {
 							enq(() => context.input.authReturned?.())
 						},
 						OAUTH_REDIRECT: ({ context, event, value }, enq) => {
 							if (
-								context.oauthScope !== context.scope ||
+								context.oauthScope !== identityCommandScope(context) ||
 								matchesState({ running: { accepting: 'retiring' } }, value) ||
 								matchesState({ running: { accepting: 'identifying' } }, value)
 							)

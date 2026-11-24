@@ -33,10 +33,12 @@ export const libraryIntentSchema = z.discriminatedUnion('type', [
 	})
 ])
 export type LibraryIntent = z.infer<typeof libraryIntentSchema>
+// Native actor-session identity, independent of a selected library's UI scope.
+const identityCommandScope = z.string().min(1).max(256)
 export const commandSchema = z.discriminatedUnion('type', [
 	z.object({
 		type: z.literal('ATPROTO'),
-		scope: z.uuid(),
+		scope: identityCommandScope,
 		handle: z.string().min(1).max(1024),
 		authorizationScope: z.enum(['atproto', 'atproto repo:at.margin.note']).optional()
 	}),
@@ -44,12 +46,12 @@ export const commandSchema = z.discriminatedUnion('type', [
 	z.object({ type: z.literal('CONNECTIVITY'), online: z.boolean() }),
 	z.object({
 		type: z.literal('RECOVERY'),
-		scope: z.string().uuid(),
+		scope: identityCommandScope,
 		event: z.discriminatedUnion('type', [simple('REVEAL'), simple('RETRY'), simple('HIDE')])
 	}),
 	z.object({
 		type: z.literal('ACCOUNT'),
-		scope: z.string().uuid(),
+		scope: identityCommandScope,
 		event: z.discriminatedUnion('type', [
 			z.object({ type: z.enum(['CREATE', 'LOGOUT', 'RETRY']) }),
 			z.object({ type: z.literal('RESTORE'), phrase: z.string().max(4096) })

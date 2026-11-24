@@ -4,6 +4,7 @@ import { createActor } from 'xstate'
 import { machineDiagnostics } from '../../web/src/lib/diagnostics/inspect.js'
 import type { accountInput } from '../../web/src/lib/backend/jazz/account.js'
 import { serveApplicationWorker } from '../../web/src/lib/runtime/worker/serve-application.js'
+import { selectIdentityCommandScope } from '../../web/src/lib/runtime/worker/host-machine.js'
 import { extensionAccountStorageKey } from './account-storage.js'
 import { extensionLibrary } from './library.js'
 import { createSignInMachine, connectionObservation, signInView } from './signin-machine.js'
@@ -59,7 +60,7 @@ export function serveExtensionAccount(options: {
 							send: (phrase) =>
 								host.send({
 									type: 'ACCOUNT',
-									scope: host.getSnapshot().context.scope,
+									scope: selectIdentityCommandScope(host.getSnapshot()),
 									event: { type: 'RESTORE', phrase }
 								})
 						}

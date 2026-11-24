@@ -518,3 +518,19 @@ accepts that identity intent and refuses another session's packet. All 1,856
 Finance unit tests, source/Svelte/test types and the five native profile/permission
 browser cases pass. The earlier hosted profile timeout remains tracked until
 new-head hosted qualification verifies it; no timeout or assertion is weakened.
+
+Clipper now uses the retained recovery owner's native actor-session ID for
+account, recovery and OAuth command origin. Public views expose that identity
+scope separately from the selected library's UI scope. A library activation or
+drain therefore cannot discard a valid recovery Close or account Restore intent.
+Changing the native identity replaces the recovery owner and retires its scope;
+old identity packets remain refused before private recovery reads. Library,
+reader and extension capture commands retain their original workspace leases.
+This uses the existing owner lifetime rather than introducing a second counter
+or a Clipper-specific selection policy.
+
+The actor regression reproduces a lost recovery HIDE after library admission,
+then verifies successful hiding, same-identity invalid restoration/reopening and
+rejection after identity replacement. Native worker restoration fixtures now
+correlate recovery availability with the identity scope while still requiring a
+new library UI scope after restoration.

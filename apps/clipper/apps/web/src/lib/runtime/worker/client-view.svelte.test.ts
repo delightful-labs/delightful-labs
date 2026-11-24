@@ -17,6 +17,7 @@ afterEach(async () => {
 function render(scope = crypto.randomUUID()): LibraryRender {
 	return {
 		scope,
+		accountScope: crypto.randomUUID(),
 		rows: [],
 		total: 0,
 		hasMore: false,

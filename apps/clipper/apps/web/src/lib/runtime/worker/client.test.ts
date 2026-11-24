@@ -20,6 +20,7 @@ class NativeWorker {
 }
 const view: RuntimeView = {
 	type: 'VIEW',
+	accountScope: crypto.randomUUID(),
 	scope: crypto.randomUUID(),
 	library: undefined,
 	oauth: { busy: false, message: undefined },

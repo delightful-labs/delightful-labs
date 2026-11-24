@@ -59,6 +59,7 @@ function fixture(title = 'First article') {
 	const initialView = selectLibraryView(undefined)
 	let current: LibraryRender = {
 		scope: crypto.randomUUID(),
+		accountScope: crypto.randomUUID(),
 		rows: [first],
 		total: 1,
 		hasMore: true,

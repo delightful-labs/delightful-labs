@@ -35,7 +35,7 @@ async function observeNativeClient(page: Page) {
 						if (!view) throw new Error('Application view unavailable')
 						this.postMessage({
 							type: 'ACCOUNT',
-							scope: view.scope,
+							scope: view.accountScope,
 							event: { type: 'RESTORE', phrase }
 						})
 						return view.scope
@@ -44,7 +44,7 @@ async function observeNativeClient(page: Page) {
 						!!view?.library &&
 						view.scope !== scope &&
 						recovery?.available === true &&
-						recovery.scope === view.scope,
+						recovery.scope === view.accountScope,
 					reveal: () =>
 						this.postMessage({
 							type: 'RECOVERY',

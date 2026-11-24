@@ -2,7 +2,7 @@ import { readingProgressSchema, documentReadingProgress } from '../../reader/sch
 import { selectAtprotoView } from '../../machines/runtime/atproto.js'
 import type { LibraryArticle } from '../../contracts/articles.js'
 import type { SnapshotFrom } from 'xstate'
-import type { workerHostMachine } from './host-machine.js'
+import { selectIdentityCommandScope, type workerHostMachine } from './host-machine.js'
 import { selectApplicationView } from '../../machines/runtime/application-readiness.js'
 import { selectLibraryView } from '../../machines/capture/library.js'
 import { selectTagFormView } from '../../machines/capture/tag-form.js'
@@ -58,11 +58,13 @@ function projectRuntimePayload(snapshot: SnapshotFrom<typeof workerHostMachine>)
 
 	return {
 		scope: snapshot.context.scope,
+		accountScope: selectIdentityCommandScope(snapshot),
 		account: selectApplicationView(application, true),
 		oauth: selectAtprotoView(snapshot.children.oauth?.getSnapshot()),
 		library: snapshot.context.library
 			? {
 					scope: snapshot.context.scope,
+					accountScope: selectIdentityCommandScope(snapshot),
 					rows,
 					total: view.rows.length,
 					hasMore: rows.length < view.rows.length,
