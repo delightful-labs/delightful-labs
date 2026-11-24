@@ -30,7 +30,7 @@ function transactionValues(
 
 beforeAll(async () => {
 	fixture = await createPolicyTestApp(app, permissions, expect)
-	db = fixture.as({ user_id: 'check-reference-writer', authMode: 'local-first', claims: {} })
+	db = fixture.as({ user_id: 'check-reference-writer', authMode: 'device-account', claims: {} })
 	await fixture.seed((seed) =>
 		seed.insert(app.organizations, { name: 'Primary' }, { id: organizationId })
 	)

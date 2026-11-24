@@ -1,1 +1,3 @@
-export const JAZZ_RUNTIME_VERSION = '2.0.0-alpha.60'
+import sdk from 'jazz-tools/package.json' with { type: 'json' }
+
+export const JAZZ_RUNTIME_VERSION = sdk.version

@@ -34,7 +34,7 @@ const actors = {
 		run: async ({ input }: { input: Input }): Promise<Prepared> => {
 			const session = {
 				user_id: input.name,
-				authMode: 'local-first',
+				authMode: 'device-account',
 				claims: {}
 			} satisfies PolicyTestSession
 			const libraryId = input.fixture.accountFor(session)

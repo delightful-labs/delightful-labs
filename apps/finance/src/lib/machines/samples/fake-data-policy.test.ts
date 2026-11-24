@@ -14,7 +14,11 @@ afterAll(async () => {
 })
 
 async function scope(name: string) {
-	const session = { user_id: name, authMode: 'local-first', claims: {} } satisfies PolicyTestSession
+	const session = {
+		user_id: name,
+		authMode: 'device-account',
+		claims: {}
+	} satisfies PolicyTestSession
 	const db = fixture.as(session)
 	const userId = fixture.accountFor(session)
 	const organizationId = crypto.randomUUID()

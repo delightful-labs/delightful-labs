@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store'
+import { reloadWindowForJazzBuild } from 'delightful-local-first/backend/jazz/worker-broker'
 import { readingProgressSchema } from '../../reader/schema.js'
 import { REALM_CLOSE_POLICY } from './close-policy.js'
 import type { WorkerCloseIssue } from './close-policy.js'
@@ -16,6 +17,7 @@ import type { RecoveryPhraseView } from 'delightful-local-first/recovery/contrac
 import type { ViewportElements } from '../../reader/viewport.js'
 
 export type WorkerReply =
+	| { type: 'RELOAD'; build: string }
 	| { type: 'NAVIGATE'; url: string }
 	| { type: 'AUTH_RETURNED' }
 	| { type: 'RECEIVED'; requestId: string; scope: string }
@@ -69,6 +71,11 @@ const resource = createCallbackLogic<Event, Input>(({ input, receive, sendBack }
 	})
 	let recoveryAttached = true
 	worker.onmessage = ({ data }: MessageEvent<WorkerReply>) => {
+		if (data.type === 'RELOAD') {
+			if (reloadWindowForJazzBuild(data.build)) sendBack({ type: 'CLOSED' })
+			else sendBack({ type: 'FAILED' })
+			return
+		}
 		switch (data.type) {
 			case 'STORAGE_NAMESPACE':
 				if (isAccountStorageKey(data.key)) storageHost.bind(data.key)

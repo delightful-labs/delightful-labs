@@ -1,13 +1,23 @@
 import { createHmac } from 'node:crypto'
 import { cp, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createJazz, sqlite } from 'jazz-tools/backend'
 import { app, permissions } from './retained-schema.mjs'
 
 // Test-only reader. It opens only a newly copied directory, never the snapshot.
-const [source, scratch, output, keyFile] = process.argv.slice(2)
-if (!source || !scratch || !output || !keyFile) throw new Error('Missing retained reader paths')
+const [sourceArgument, scratchArgument, outputArgument, keyArgument] = process.argv.slice(2)
+if (!sourceArgument || !scratchArgument || !outputArgument || !keyArgument)
+	throw new Error('Missing retained reader paths')
+const source = resolve(sourceArgument),
+	scratch = resolve(scratchArgument),
+	output = resolve(outputArgument),
+	keyFile = resolve(keyArgument)
+// Keep native binding/source checks scoped to this prepared app, independent
+// of whichever project the operator happened to launch the tool from.
+process.chdir(dirname(fileURLToPath(import.meta.url)))
+process.env.JAZZ_APP_DIR = dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
 const version = require('jazz-tools/package.json').version
 const native = createRequire(require.resolve('jazz-tools/package.json'))
@@ -35,7 +45,21 @@ await cp(join(source, 'store'), scratch, { recursive: true })
 await copyFile(join(source, 'app-id'), join(scratch, 'app-id'))
 const appId = (await readFile(join(source, 'app-id'), 'utf8')).trim()
 if (!appId) throw new Error('Missing retained app identity')
-const jazz = createJazz({ app, permissions, store: sqlite({ path: scratch, blobs: 'sqlite' }) })
+const blobStore = await readFile(join(scratch, 'blob-store'), 'utf8')
+	.then((record) => record.trim())
+	.catch((error) => {
+		// Native stores without a blob-store record keep large values in SQLite.
+		if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT')
+			return 'sqlite'
+		throw error
+	})
+if (blobStore !== 'files' && blobStore !== 'sqlite')
+	throw new Error('Retained reader requires a complete local files or SQLite blob snapshot')
+const jazz = createJazz({
+	app,
+	permissions,
+	store: sqlite({ path: scratch, ...(blobStore === 'sqlite' ? { blobs: 'sqlite' } : {}) })
+})
 try {
 	await jazz.ready()
 	if (jazz.appId !== appId) throw new Error('Retained app identity changed')

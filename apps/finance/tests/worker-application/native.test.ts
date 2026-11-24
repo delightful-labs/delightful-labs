@@ -15,9 +15,11 @@ import { app } from '../../src/lib/queries.js'
 import permissions from '../../src/lib/jazz.permissions.json' with { type: 'json' }
 import svg from '@poppanator/sveltekit-svg'
 import { createServer } from 'node:http'
-import { glob, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { cp, glob, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { extname, join, resolve } from 'node:path'
-import { build } from 'vite'
+import { build, type InlineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { expect as playwrightExpect, chromium, firefox, webkit, type Page } from '@playwright/test'
@@ -33,6 +35,7 @@ let server: ReturnType<typeof createServer> | undefined
 const fixtureSockets = new Set<Socket>()
 let fixtureJazz: ReturnType<typeof createJazz> | undefined
 let fixtureAuth: ((request: Request) => Promise<Response>) | undefined
+let handoverDocument: 'old' | 'new' | undefined
 async function relayAuth(
 	request: IncomingMessage,
 	response: ServerResponse,
@@ -71,7 +74,9 @@ beforeAll(async () => {
 	await mkdir('.svelte-kit', { recursive: true })
 	directory = await mkdtemp(resolve('.svelte-kit/finance-worker-read-'))
 	const output = join(directory, 'build')
-	await build({
+	let futureBindings: string | undefined
+	let futureBindingsUsed = false
+	const configuration = {
 		...workerRuntimeBuildConfig(),
 		configFile: false,
 		resolve: {
@@ -118,6 +123,12 @@ beforeAll(async () => {
 				{
 					name: 'finance-native-read-controls',
 					enforce: 'pre',
+					load(id) {
+						if (futureBindings && id === resolve('src/lib/jazz.generated.ts')) {
+							futureBindingsUsed = true
+							return futureBindings
+						}
+					},
 					resolveId(source, importer) {
 						if (
 							source === './binding.js' &&
@@ -163,13 +174,64 @@ beforeAll(async () => {
 			minify: false,
 			rolldownOptions: { input: resolve('tests/worker-application/index.html') }
 		}
-	})
+	} satisfies InlineConfig
+	await build(configuration)
 	const assets = new Map<string, { bytes: Buffer; type: string }>()
 	for await (const file of glob('**/*', { cwd: output })) {
 		const path = join(output, file)
 		if (!(await stat(path)).isFile()) continue
 		assets.set('/' + file, {
 			bytes: await readFile(path),
+			type:
+				extname(file) === '.html'
+					? 'text/html'
+					: extname(file) === '.js'
+						? 'application/javascript'
+						: extname(file) === '.css'
+							? 'text/css'
+							: 'application/octet-stream'
+		})
+	}
+	// Generate an actual descendant schema in an owned copy. No application
+	// schema/migration or SDK build-order decision is replaced by the fixture.
+	const futureSource = join(directory, 'future-source')
+	await cp('src', join(futureSource, 'src'), { recursive: true })
+	const schemaPath = join(futureSource, 'src/lib/schema.ts')
+	const schema = await readFile(schemaPath, 'utf8')
+	const anchor = 'export const schema = s.defineSchema(restoreDefinition)'
+	if (!schema.includes(anchor)) throw new Error('Handover schema fixture anchor missing')
+	await writeFile(
+		schemaPath,
+		schema.replace(
+			anchor,
+			'export const schema = s.defineSchema({ ...restoreDefinition, accounts: s.table({ ...restoreDefinition.accounts.columns, upgradeFixture: s.string().optional() }, restoreDefinition.accounts.relations) })'
+		)
+	)
+	const require = createRequire(import.meta.url)
+	const cli = join(require.resolve('jazz-tools/package.json'), '../bin/jazz-tools.js')
+	for (const args of [
+		['migrations', 'create', '--name', 'worker-handover-fixture'],
+		['generate'],
+		['generate', '--check']
+	])
+		execFileSync(process.execPath, [cli, ...args, '--schema-dir', join(futureSource, 'src/lib')], {
+			stdio: 'pipe'
+		})
+	futureBindings = await readFile(join(futureSource, 'src/lib/jazz.generated.ts'), 'utf8')
+	const futureOutput = join(directory, 'future-build')
+	await build({ ...configuration, build: { ...configuration.build, outDir: futureOutput } })
+	if (!futureBindingsUsed) throw new Error('Descendant schema was not included in the worker')
+	futureBindings = undefined
+	for await (const file of glob('**/*', { cwd: futureOutput })) {
+		const path = join(futureOutput, file)
+		if (!(await stat(path)).isFile()) continue
+		const key = file === 'tests/worker-application/index.html' ? '/future.html' : '/' + file
+		const bytes = await readFile(path)
+		const existing = assets.get(key)
+		if (existing && !existing.bytes.equals(bytes))
+			throw new Error('Fixture asset collision: ' + key)
+		assets.set(key, {
+			bytes,
 			type:
 				extname(file) === '.html'
 					? 'text/html'
@@ -228,7 +290,15 @@ beforeAll(async () => {
 			void relayAuth(request, response, fixtureAuth)
 			return
 		}
-		const asset = assets.get(path === '/' ? '/tests/worker-application/index.html' : path)
+		const document =
+			path === '/accounts' && handoverDocument
+				? handoverDocument === 'new'
+					? '/future.html'
+					: '/tests/worker-application/index.html'
+				: path === '/'
+					? '/tests/worker-application/index.html'
+					: path
+		const asset = assets.get(document)
 		response.writeHead(asset ? 200 : 404, {
 			'Content-Type': asset?.type ?? 'text/plain',
 			'Cache-Control': 'no-store'
@@ -277,18 +347,23 @@ async function openDrawerSection(page: Page, name: string) {
 	if ((await section.getAttribute('open')) === null) await section.locator('summary').click()
 	return section
 }
-async function open(page: Page, scope: string, serverUrl = origin + '/jazz') {
-	await page.goto(origin)
+async function configure(page: Page, scope: string, serverUrl = origin + '/jazz') {
 	await page.waitForFunction(() => !!window.financeWorkerReadFixture)
 	await page.evaluate(
-		({ scope, serverUrl }) =>
+		({ scope, serverUrl }) => {
 			window.financeWorkerReadFixture.open({
 				scope,
 				serverUrl,
 				environment: 'worker-read-proof'
-			}),
+			})
+		},
 		{ scope, serverUrl }
 	)
+}
+async function open(page: Page, scope: string, serverUrl = origin + '/jazz', document = '/') {
+	await page.goto(origin + document)
+	if (document !== '/') await page.evaluate(() => history.replaceState(null, '', '/'))
+	await configure(page, scope, serverUrl)
 	await browserExpect
 		.poll(() => page.evaluate(() => window.financeWorkerReadFixture.state().status))
 		.toBe('ready')
@@ -352,6 +427,102 @@ async function enterExpenseUI(page: Page, accountId: string, description: string
 }
 for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
 	describe(name, () => {
+		it.each(['new', 'old'] satisfies ('new' | 'old')[])(
+			'hands a schema-ordered build to a %s document after pending work and bounds cached reloads',
+			async (document) => {
+				onTestFailed(() => {
+					retained = true
+				})
+				const browser = await engine.launch({ headless: true })
+				const context = await browser.newContext()
+				const old = await context.newPage()
+				let reloads = 0
+				try {
+					const scope = crypto.randomUUID(),
+						workspaceId = crypto.randomUUID(),
+						accountId = crypto.randomUUID()
+					await open(old, scope)
+					const identity = await old.evaluate(
+						() => window.financeWorkerReadFixture.state().identityId
+					)
+					expect(identity).not.toBeNull()
+					expect(
+						await old.evaluate(
+							({ workspaceId, accountId }) =>
+								window.financeWorkerReadFixture.seed(workspaceId, accountId, 'Handover account'),
+							{ workspaceId, accountId }
+						)
+					).toEqual({ ok: true })
+					await selectWorkspaceUI(old, workspaceId)
+					expect(
+						await old.evaluate(
+							({ workspaceId, accountId }) =>
+								window.financeWorkerReadFixture.seedLedger(workspaceId, accountId),
+							{ workspaceId, accountId }
+						)
+					).toEqual({ ok: true })
+					const before = await old.evaluate(
+						(id) => window.financeWorkerReadFixture.transactions(id),
+						workspaceId
+					)
+					expect(before.transactions).toHaveLength(40)
+					expect(await old.evaluate(() => window.financeWorkerReadFixture.holdArchive())).toEqual({
+						ok: true
+					})
+					await archiveAccountUI(old, 'Handover account')
+					await browserExpect(
+						old.getByRole('cell', { name: 'Handover account', exact: true })
+					).toHaveCount(0)
+					old.on('framenavigated', (frame) => {
+						if (frame === old.mainFrame()) reloads++
+					})
+					handoverDocument = document
+					const future = await context.newPage()
+					await open(future, scope, origin + '/jazz', '/future.html')
+					await browserExpect
+						.poll(() => old.evaluate(() => window.financeWorkerReadFixture.state().status))
+						.toBe('closing')
+					expect(reloads).toBe(0)
+					expect(
+						await future.evaluate(() => window.financeWorkerReadFixture.state().identityId)
+					).toBe(identity)
+					const reloaded = old.waitForEvent('domcontentloaded')
+					expect(
+						await old.evaluate(() => window.financeWorkerReadFixture.releaseArchive())
+					).toEqual({ ok: true })
+					await reloaded
+					expect(reloads).toBe(1)
+					await configure(old, scope)
+					await browserExpect
+						.poll(() => old.evaluate(() => window.financeWorkerReadFixture.state().status))
+						.toBe(document === 'new' ? 'ready' : 'failed')
+					expect(reloads).toBe(1)
+					const after = await future.evaluate(
+						(id) => window.financeWorkerReadFixture.transactions(id),
+						workspaceId
+					)
+					expect(after.transactions?.toSorted((a, b) => a.id.localeCompare(b.id))).toEqual(
+						before.transactions?.toSorted((a, b) => a.id.localeCompare(b.id))
+					)
+					if (document === 'new') {
+						expect(
+							await old.evaluate(() => window.financeWorkerReadFixture.state().identityId)
+						).toBe(identity)
+						await close(old)
+					} else {
+						await browserExpect
+							.poll(() =>
+								old.evaluate(() => window.financeWorkerReadFixture.state().canRetrySession)
+							)
+							.toBe(false)
+					}
+					await close(future)
+				} finally {
+					handoverDocument = undefined
+					await browser.close()
+				}
+			}
+		)
 		it('switches to an existing provider account, signs out, recovers local work and reopens offline', async () => {
 			onTestFailed(() => {
 				retained = true

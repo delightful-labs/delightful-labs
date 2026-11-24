@@ -23,7 +23,7 @@
 			return client
 		}
 	})
-	const route = fromStore(client.location)
+	const route = $derived(fromStore(client.location))
 	const path = $derived(route.current.pathname)
 </script>
 

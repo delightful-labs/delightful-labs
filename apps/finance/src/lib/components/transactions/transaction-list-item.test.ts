@@ -100,8 +100,8 @@ it('renders transfer rows with independent dates, currencies, descriptions and a
 				requestedPage: 1
 			},
 			onPage: () => {},
-			pageHref: (page) => `/transfers?page=${page}`,
-			transferHref: (id) => `/transfers/${id}`
+			pageHref: (page: number) => `/transfers?page=${page}`,
+			transferHref: (id: string) => `/transfers/${id}`
 		},
 		context
 	})

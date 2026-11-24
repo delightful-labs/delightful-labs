@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest'
+import { JAZZ_RUNTIME_VERSION } from './runtime-version.js'
 import {
 	publicAssetResponse,
 	obsoleteShellCaches,
@@ -45,10 +46,15 @@ it('caches only the public shell and listed build assets', () => {
 it('normalizes only exact Jazz runtime version queries into the one immutable cache entry', () => {
 	for (const path of ['jazz_wasm_bg.hash.wasm', 'jazz-broker-worker.hash.js']) {
 		const key = 'https://clipper.example/_app/immutable/assets/' + path
-		expect(shellKey(policy, new Request(key + '?jazz-runtime-version=2.0.0-alpha.60'))).toBe(key)
+		expect(
+			shellKey(policy, new Request(key + '?jazz-runtime-version=' + JAZZ_RUNTIME_VERSION))
+		).toBe(key)
 		expect(shellKey(policy, new Request(key + '?jazz-runtime-version=wrong'))).toBeUndefined()
 		expect(
-			shellKey(policy, new Request(key + '?jazz-runtime-version=2.0.0-alpha.60&other=x'))
+			shellKey(
+				policy,
+				new Request(key + '?jazz-runtime-version=' + JAZZ_RUNTIME_VERSION + '&other=x')
+			)
 		).toBeUndefined()
 	}
 })

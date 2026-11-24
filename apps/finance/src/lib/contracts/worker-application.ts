@@ -510,7 +510,7 @@ export const financeWorkerReply = z.discriminatedUnion('type', [
 	financeImageEditorRequest,
 	financeWebAuthnRequest,
 	financeDownloadRequest,
-	z.strictObject({ type: z.literal('RELOAD_PAGE') }),
+	z.strictObject({ type: z.literal('RELOAD_PAGE'), build: z.string().max(8192).optional() }),
 	z.strictObject({ type: z.literal('AUTH_RETURNED') }),
 	z.strictObject({
 		type: z.literal('PROVIDER_NAVIGATE'),

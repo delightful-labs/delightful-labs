@@ -13,7 +13,7 @@ const incomeTransactionId = crypto.randomUUID()
 const transferId = crypto.randomUUID()
 const session = {
 	user_id: 'internal-transfer-policy-test',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies import('jazz-tools/testing').PolicyTestSession
 let fixture: PolicyTestApp

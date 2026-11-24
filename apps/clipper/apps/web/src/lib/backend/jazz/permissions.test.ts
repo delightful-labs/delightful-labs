@@ -14,7 +14,7 @@ afterAll(async () => {
 it('converges identical canonical ensures and rejects alternate/foreign roots', async () => {
 	const owner = {
 		user_id: 'clipper-owner',
-		authMode: 'local-first',
+		authMode: 'device-account',
 		claims: {}
 	} satisfies import('jazz-tools/testing').PolicyTestSession
 	const ownerId = fixture.accountFor(owner)
@@ -33,7 +33,11 @@ it('converges identical canonical ensures and rejects alternate/foreign roots', 
 	await expect(
 		a.update(app.libraries, ownerId, { bootstrapVersion: '2' }).wait({ tier: 'global' })
 	).rejects.toThrow(/AuthorizationDenied|Write rejected/)
-	const stranger = fixture.as({ user_id: 'clipper-stranger', authMode: 'local-first', claims: {} })
+	const stranger = fixture.as({
+		user_id: 'clipper-stranger',
+		authMode: 'device-account',
+		claims: {}
+	})
 	expect(await stranger.one(app.libraries.where({ id: ownerId }))).toBeNull()
 	await expect(async () =>
 		stranger.upsert(app.libraries, ownerId, payload).wait({ tier: 'global' })
@@ -68,7 +72,7 @@ it('keeps backend auth records unreadable and immutable to guest and signed-in c
 		)
 	)
 	for (const session of [
-		{ user_id: 'auth-guest', authMode: 'local-first' as const, claims: {} },
+		{ user_id: 'auth-guest', authMode: 'device-account' as const, claims: {} },
 		{
 			user_id: userId,
 			issuer: 'https://example.invalid',

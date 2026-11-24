@@ -26,12 +26,10 @@ if (
 )
 	throw new Error('Choose --schema, --clipper-schema or --worker')
 const selectedVersion = process.argv.find((argument) => argument.startsWith('--sdk='))?.slice(6)
-if (selectedVersion !== undefined && selectedVersion !== '2.0.0-alpha.67')
-	throw new Error('The maintained candidate is jazz-tools@2.0.0-alpha.67')
-const sdkVersion = '2.0.0-alpha.67'
-const directory = mkdtempSync(
-	join(tmpdir(), `finance-jazz-${sdkVersion.replace('2.0.0-alpha.', 'alpha')}-`)
-)
+const sdkVersion = '2.0.0-beta.1'
+if (selectedVersion !== undefined && selectedVersion !== sdkVersion)
+	throw new Error(`The maintained candidate is jazz-tools@${sdkVersion}`)
+const directory = mkdtempSync(join(tmpdir(), `finance-jazz-${sdkVersion.replace('2.0.0-', '')}-`))
 console.log(`Upgrade proof artifacts: ${directory}`)
 const run = (command, args, cwd = directory) =>
 	execFileSync(command, args, { cwd, stdio: 'inherit' })
@@ -54,12 +52,9 @@ mkdirSync(candidate)
 run('tar', ['-xzf', tarball, '-C', candidate])
 const sdk = join(candidate, 'package')
 if (!schemaOnly) {
-	run(
-		'git',
-		['apply', '--check', '--whitespace=error-all', join(proof, 'worker-bridge.patch')],
-		sdk
-	)
-	run('git', ['apply', join(proof, 'worker-bridge.patch')], sdk)
+	const patch = join(finance, '../../patches', `jazz-tools@${sdkVersion}.patch`)
+	run('git', ['apply', '--check', '--whitespace=error-all', patch], sdk)
+	run('git', ['apply', patch], sdk)
 }
 run('tar', ['-czf', join(directory, 'candidate-sdk.tgz'), '-C', candidate, 'package'])
 
@@ -75,6 +70,10 @@ for (const name of ['local-first', 'ui']) {
 	)
 }
 const packages = [
+	'@faker-js/faker',
+	'better-auth',
+	'@kingironman2011/better-auth-bsky',
+	'layerchart',
 	'vite',
 	'vitest',
 	'@playwright/test',
@@ -145,7 +144,18 @@ json(join(app, 'package.json'), {
 	private: true,
 	type: 'module',
 	imports: { '#lib/*': './src/lib/*' },
-	pnpm: { overrides: { '@opentelemetry/api': versions['@opentelemetry/api'] } },
+	pnpm: {
+		overrides: { '@opentelemetry/api': versions['@opentelemetry/api'] },
+		patchedDependencies: {
+			'@kingironman2011/better-auth-bsky@0.3.2': '../provider.patch'
+		},
+		// Match the root's missing-peer declarations for existing chart utilities.
+		packageExtensions: {
+			'@layerstack/utils@2.0.0-next.19': { peerDependencies: { svelte: '^5.0.0' } },
+			'@layerstack/svelte-state@0.1.0-next.25': { peerDependencies: { svelte: '^5.0.0' } },
+			'@layerstack/svelte-actions@1.0.1-next.20': { peerDependencies: { svelte: '^5.0.0' } }
+		}
+	},
 	dependencies: {
 		...versions,
 		'jazz-tools': 'file:../candidate-sdk.tgz',
@@ -153,6 +163,10 @@ json(join(app, 'package.json'), {
 		'delightful-local-first': 'file:../local-first.tgz'
 	}
 })
+cpSync(
+	join(finance, '../clipper/patches/better-auth-bsky-0.3.2-better-auth-1.7.patch'),
+	join(directory, 'provider.patch')
+)
 // Explicit SDK peer versions prevent an implicit alpha.60 installation here.
 writeFileSync(join(app, '.npmrc'), 'auto-install-peers=false\n')
 json(join(app, 'tsconfig.json'), {

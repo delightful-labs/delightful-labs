@@ -12,7 +12,11 @@ afterAll(async () => {
 	await fixture?.shutdown()
 })
 function account(name: string) {
-	const session = { user_id: name, authMode: 'local-first', claims: {} } satisfies PolicyTestSession
+	const session = {
+		user_id: name,
+		authMode: 'device-account',
+		claims: {}
+	} satisfies PolicyTestSession
 	return { db: fixture.as(session), id: fixture.accountFor(session) }
 }
 function identity() {

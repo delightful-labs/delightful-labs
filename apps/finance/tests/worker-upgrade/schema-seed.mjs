@@ -140,7 +140,7 @@ try {
 			2
 		) + '\n'
 	)
-	console.log('Seeded actual alpha.60 Finance records; closing before alpha.66 opens them')
+	console.log('Seeded actual alpha.60 Finance records; closing before the candidate opens them')
 } finally {
 	await jazz.close()
 }

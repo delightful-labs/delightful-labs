@@ -10,7 +10,7 @@ it('delegates cookie and native guest proof admission to the actual backend auth
 	expect(await authenticateGateway(request, { accountFor })).toEqual({
 		accountId: '77777777-7777-4777-8777-777777777777'
 	})
-	expect(accountFor).toHaveBeenCalledWith(request)
+	expect(accountFor).toHaveBeenCalledWith(request, { deviceAccounts: true })
 })
 it('distinguishes missing/invalid identity from an unavailable authority', async () => {
 	const request = new Request('https://example.invalid/api/capture/resolve')

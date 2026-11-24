@@ -18,7 +18,7 @@ afterEach(() => vi.unstubAllGlobals())
 it('reuses native root and library builders without exposing their database', async () => {
 	const session = {
 		user_id: 'library-binding-owner',
-		authMode: 'local-first',
+		authMode: 'device-account',
 		claims: {}
 	} satisfies PolicyTestSession
 	const db = fixture.as(session),
@@ -52,7 +52,11 @@ it('reuses native root and library builders without exposing their database', as
 })
 
 it('refuses capture before dispatch and retires a response after binding replacement', async () => {
-	const db = fixture.as({ user_id: 'capture-binding-owner', authMode: 'local-first', claims: {} })
+	const db = fixture.as({
+		user_id: 'capture-binding-owner',
+		authMode: 'device-account',
+		claims: {}
+	})
 	let current = false
 	const response = new Response('captured body')
 	if (!response.body) throw new Error('Missing native response stream')
@@ -75,7 +79,7 @@ it('refuses capture before dispatch and retires a response after binding replace
 it('observes native local root access independently of bootstrap completion', async () => {
 	const session = {
 		user_id: 'observed-canonical-root',
-		authMode: 'local-first',
+		authMode: 'device-account',
 		claims: {}
 	} satisfies PolicyTestSession
 	const db = fixture.as(session)
@@ -114,7 +118,7 @@ it('observes native local root access independently of bootstrap completion', as
 it('keeps explicit workspace targeting separate from the native identity', async () => {
 	const session = {
 		user_id: 'explicit-workspace-target',
-		authMode: 'local-first',
+		authMode: 'device-account',
 		claims: {}
 	} satisfies PolicyTestSession
 	const db = fixture.as(session)
@@ -150,7 +154,7 @@ it('keeps explicit workspace targeting separate from the native identity', async
 it('converges concurrent shared initialization on one native canonical root and reopens it without a write', async () => {
 	const session = {
 		user_id: 'concurrent-canonical-root',
-		authMode: 'local-first',
+		authMode: 'device-account',
 		claims: {}
 	} satisfies PolicyTestSession
 	const db = fixture.as(session)

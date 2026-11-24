@@ -187,7 +187,7 @@ for (const scenario of archiveScenarios) {
 	test(
 		`account archive permissions: ${scenario.name}`,
 		{ tag: ['@account-archive', '@permissions', '@accounts'] },
-		async ({ page, browser, baseURL }) => {
+		async ({ page, browser, baseURL }, testInfo) => {
 			await start(page)
 			const organizationId = await page
 				.getByLabel('Current Workspace', { exact: true })
@@ -195,8 +195,15 @@ for (const scenario of archiveScenarios) {
 			const subjectContext = await browser.newContext({
 				baseURL: baseURL ?? 'http://127.0.0.1:5173'
 			})
+			const diagnostics: Promise<unknown>[] = []
 			try {
 				const subject = await subjectContext.newPage()
+				subject.on('console', (message) => {
+					if (message.text().startsWith('[state-machine]'))
+						diagnostics.push(
+							Promise.allSettled(message.args().map((argument) => argument.jsonValue()))
+						)
+				})
 				await start(subject)
 				const subjectId = await financeFixture(subject, 'features/accounts.e2e:303')
 				const accountId = await financeFixture(page, 'features/accounts.e2e:304', {
@@ -237,6 +244,10 @@ for (const scenario of archiveScenarios) {
 					.poll(() => financeFixture(page, 'features/accounts.e2e:378', accountId))
 					.toEqual({ exists: true, archived: scenario.write })
 			} finally {
+				await testInfo.attach('machine-diagnostics', {
+					body: JSON.stringify(await Promise.allSettled(diagnostics)),
+					contentType: 'application/json'
+				})
 				await subjectContext.close()
 			}
 		}

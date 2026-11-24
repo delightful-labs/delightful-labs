@@ -16,7 +16,7 @@ const permissions = {
 
 const session = {
 	user_id: 'invitation-adapter-user',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies import('jazz-tools/testing').PolicyTestSession
 let fixture: PolicyTestApp

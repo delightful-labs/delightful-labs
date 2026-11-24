@@ -9,6 +9,7 @@ import permissions from '../jazz.permissions.json' with { type: 'json' }
 // Keep the qualified local store; Vercel uses the SDK's native environment/branch namespace.
 const store = process.env.VERCEL
 	? vercel({
+			region: 'iad1',
 			namespace: ({ environment, branch }) =>
 				environment === 'production' ? 'production' : perBranch(branch),
 			vcpus: 1,

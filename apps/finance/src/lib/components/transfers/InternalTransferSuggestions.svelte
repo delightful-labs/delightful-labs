@@ -33,7 +33,7 @@
 	}: {
 		suggestions: readonly Suggestion[]
 		writableSuggestionIds: ReadonlySet<string>
-		editorState: Exclude<TransactionEditTransferState, 'unselected'>
+		editorState: TransactionEditTransferState
 		selectedId: string | null
 		onSelect: ((transactionId: string) => void) | undefined
 		pending: boolean

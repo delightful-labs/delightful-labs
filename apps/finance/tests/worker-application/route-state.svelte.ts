@@ -8,7 +8,9 @@ export const page = {
 		const id = url.pathname.match(/^\/(?:income|expenses)\/([^/]+)$/)?.[1]
 		return id && id !== 'new' ? { id } : {}
 	},
-	shallow: undefined
+	get shallow(): { url: URL } | undefined {
+		return undefined
+	}
 }
 export function observePage(location: URL) {
 	url = location

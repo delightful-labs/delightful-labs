@@ -8,12 +8,12 @@ import { createActor, toPromise } from 'xstate'
 
 const ownerSession = {
 	user_id: 'private-creation-owner',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies import('jazz-tools/testing').PolicyTestSession
 const otherSession = {
 	user_id: 'private-creation-other',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies import('jazz-tools/testing').PolicyTestSession
 const profileId = crypto.randomUUID()

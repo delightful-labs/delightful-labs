@@ -28,19 +28,19 @@ const historicalLinkId = crypto.randomUUID()
 const expenseId = crypto.randomUUID()
 const session = {
 	user_id: 'permission-integrity',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies import('jazz-tools/testing').PolicyTestSession
 let fixture: PolicyTestApp
 let db: TestDb
 const selectedMemberSession = {
 	user_id: 'check-selected-member',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies import('jazz-tools/testing').PolicyTestSession
 const viewerSession = {
 	user_id: 'check-viewer',
-	authMode: 'local-first',
+	authMode: 'device-account',
 	claims: {}
 } satisfies import('jazz-tools/testing').PolicyTestSession
 let selectedMemberDb: TestDb
@@ -491,7 +491,7 @@ describe('transaction attachment permissions', () => {
 				.wait({ tier: 'global' })
 			stranger = fixture.as({
 				user_id: 'attachment-stranger',
-				authMode: 'local-first',
+				authMode: 'device-account',
 				claims: {}
 			})
 			// A grant for another organization must not authorize this transaction.
@@ -563,7 +563,7 @@ describe('transaction attachment permissions', () => {
 			async (role, mode, grant, readable) => {
 				const identity = {
 					user_id: `attachment-${role}-${mode}-${grant}`,
-					authMode: 'local-first',
+					authMode: 'device-account',
 					claims: {}
 				} satisfies import('jazz-tools/testing').PolicyTestSession
 				const reader = fixture.as(identity)
@@ -1590,7 +1590,7 @@ describe.each(['income', 'expense'] satisfies ('income' | 'expense')[])(
 		it.each(moveCases)('$label', async ({ label, role, mode, source, target, allowed }) => {
 			const actorSession = {
 				user_id: `check-move-${kind}-${label}`,
-				authMode: 'local-first',
+				authMode: 'device-account',
 				claims: {}
 			} satisfies import('jazz-tools/testing').PolicyTestSession
 			const writer = fixture.as(actorSession)
@@ -1723,7 +1723,7 @@ describe('new paired transfer insertion', () => {
 		async ({ label, role, mode, source, target, allowed }) => {
 			const actorSession = {
 				user_id: `provider-link-${label}`,
-				authMode: 'local-first',
+				authMode: 'device-account',
 				claims: {}
 			} satisfies import('jazz-tools/testing').PolicyTestSession
 			const writer = fixture.as(actorSession)
@@ -1855,7 +1855,7 @@ describe('new paired transfer insertion', () => {
 		async ({ label, role, mode, source, target, allowed }) => {
 			const actorSession = {
 				user_id: `paired-create-${label}`,
-				authMode: 'local-first',
+				authMode: 'device-account',
 				claims: {}
 			} satisfies import('jazz-tools/testing').PolicyTestSession
 			const writer = fixture.as(actorSession)

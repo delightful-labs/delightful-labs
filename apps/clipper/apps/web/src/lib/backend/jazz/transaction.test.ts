@@ -31,7 +31,7 @@ it.each(['scope', 'shutdown', 'committed', 'uncertain'] as const)(
 	async (mode) => {
 		const session: PolicyTestSession = {
 			user_id: `transaction-${mode}`,
-			authMode: 'local-first',
+			authMode: 'device-account',
 			claims: {}
 		}
 		const db = fixture.as(session),

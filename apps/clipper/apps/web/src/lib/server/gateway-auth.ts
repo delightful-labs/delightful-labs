@@ -12,7 +12,7 @@ export async function authenticateGateway(request: Request, backend: Pick<Jazz, 
 			{ status, headers }
 		)
 	try {
-		const accountId = await backend.accountFor(request)
+		const accountId = await backend.accountFor(request, { deviceAccounts: true })
 		if (!accountId) return failure(401)
 		return { accountId }
 	} catch (error) {

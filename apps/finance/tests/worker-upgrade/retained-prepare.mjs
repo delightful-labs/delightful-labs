@@ -10,6 +10,10 @@ import { fileURLToPath } from 'node:url'
 const proof = dirname(fileURLToPath(import.meta.url))
 if (!process.argv[2]) throw new Error('Pass a qualified Finance schema artifact directory')
 const artifact = resolve(process.argv[2])
+const clipper = process.argv[3] === '--clipper'
+if (process.argv[3] !== undefined && !clipper) throw new Error('Unknown retained reader scope')
+const schemaPath = clipper ? 'app/src/lib/backend/jazz' : 'app/src/lib'
+const entry = clipper ? 'jazz.generated.ts' : 'queries.ts'
 const identity = JSON.parse(readFileSync(join(artifact, 'schema-identity.json'), 'utf8'))
 const tools = createRequire(join(artifact, 'app/package.json'))
 const sdkVersion = tools('jazz-tools/package.json').version
@@ -17,23 +21,28 @@ assert.equal(
 	JSON.parse(readFileSync(join(artifact, 'sdk-metadata.json'), 'utf8')).version,
 	sdkVersion
 )
-assert.equal(identity.alpha60, identity[sdkVersion.replace('2.0.0-alpha.', 'alpha')].current)
+assert.equal(sdkVersion, '2.0.0-beta.1')
+assert.ok(identity[sdkVersion].schemas.some((schema) => schema.hash === identity.alpha60))
+assert.deepEqual(identity[sdkVersion], identity['2.0.0-alpha.67'])
 const sdk = createRequire(tools.resolve('jazz-tools/package.json'))
 const { build } = sdk('esbuild')
 const directory = mkdtempSync(join(tmpdir(), 'finance-retained-readers-'))
-for (const version of ['60', '66', '67']) {
-	const path = join(directory, 'alpha' + version)
+for (const [name, version] of [
+	['alpha67', '2.0.0-alpha.67'],
+	['beta1', sdkVersion]
+]) {
+	const path = join(directory, name)
 	mkdirSync(path)
 	writeFileSync(
 		join(path, 'package.json'),
 		JSON.stringify(
 			{
-				name: 'finance-retained-reader',
+				name: 'jazz-retained-reader',
 				private: true,
 				type: 'module',
 				dependencies: {
-					'jazz-tools': '2.0.0-alpha.' + version,
-					zod: '4.1.11',
+					'jazz-tools': version,
+					zod: tools('zod/package.json').version,
 					ws: '8.22.1',
 					'@opentelemetry/api': '1.9.1'
 				},
@@ -49,10 +58,9 @@ for (const version of ['60', '66', '67']) {
 		'supportedArchitectures:\n  os: [current, linux]\n  cpu: [current, x64]\n  libc: [glibc]\n'
 	)
 	execFileSync('pnpm', ['install', '--ignore-scripts'], { cwd: path, stdio: 'inherit' })
-	const contents =
-		version === '60'
-			? `export { app } from ${JSON.stringify(join(artifact, 'legacy/retained-schema.mjs'))};\nexport { default as permissions } from ${JSON.stringify(join(artifact, 'legacy/retained-permissions.mjs'))};`
-			: `export { app } from ${JSON.stringify(join(artifact, 'app/src/lib/queries.ts'))};\nexport { default as permissions } from ${JSON.stringify(join(artifact, 'app/src/lib/jazz.permissions.json'))} with { type: 'json' };`
+	// Both readers use the same current app. Historical alpha.60 production and
+	// archive compatibility are qualified separately by the schema runner.
+	const contents = `export { app } from ${JSON.stringify(join(artifact, schemaPath, entry))};\nexport { default as permissions } from ${JSON.stringify(join(artifact, schemaPath, 'jazz.permissions.json'))} with { type: 'json' };`
 	await build({
 		stdin: { contents, resolveDir: path },
 		outfile: join(path, 'retained-schema.mjs'),
@@ -61,6 +69,8 @@ for (const version of ['60', '66', '67']) {
 		platform: 'node',
 		format: 'esm'
 	})
+	for (const file of ['jazz.app.json', 'jazz.permissions.json'])
+		copyFileSync(join(artifact, schemaPath, file), join(path, file))
 	copyFileSync(join(proof, 'retained-read.mjs'), join(path, 'retained-read.mjs'))
 }
 copyFileSync(join(proof, 'retained-compare.mjs'), join(directory, 'retained-compare.mjs'))
@@ -75,9 +85,8 @@ execFileSync(
 		'--exclude=*musl*',
 		'--exclude=*win32*',
 		'--exclude=*.map',
-		'alpha60',
-		'alpha66',
 		'alpha67',
+		'beta1',
 		'retained-compare.mjs'
 	],
 	{ cwd: directory, stdio: 'inherit' }

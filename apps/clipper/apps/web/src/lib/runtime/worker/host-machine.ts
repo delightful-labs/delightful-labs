@@ -83,6 +83,7 @@ type Context = {
 	closeIssue: WorkerCloseIssue | undefined
 	renderRevision: number
 	oauthScope: string | undefined
+	reloadFrom: string | undefined
 	redirect: string | undefined
 	recovery: RecoveryOwner | undefined
 	input: Input
@@ -114,6 +115,7 @@ type Event =
 	  }
 	| { type: 'OAUTH_REDIRECT'; url: string }
 	| { type: 'OAUTH_RETURNED' }
+	| { type: 'NEWER_BUILD'; build: string }
 	| { type: 'SHUTDOWN' }
 	| { type: 'SESSION_CLOSE_STAGE'; stage: 'acquisition' | 'session' }
 	| { type: 'APPLICATION_CLOSED'; clean: boolean }
@@ -147,8 +149,9 @@ const actors = {
 export const workerHostMachine = setup({
 	schemas: {
 		context: types<Context>(),
-		output: types<{ outcome: 'closed'; redirect: string | undefined }>(),
+		output: types<{ outcome: 'closed'; redirect: string | undefined; reloadFrom?: string }>(),
 		events: {
+			NEWER_BUILD: types<EventPayload<Event, 'NEWER_BUILD'>>(),
 			SHUTDOWN: types<EventPayload<Event, 'SHUTDOWN'>>(),
 			ATPROTO: types<EventPayload<Event, 'ATPROTO'>>(),
 			OAUTH_REDIRECT: types<EventPayload<Event, 'OAUTH_REDIRECT'>>(),
@@ -248,6 +251,7 @@ export const workerHostMachine = setup({
 		closeIssue: undefined,
 		renderRevision: 0,
 		oauthScope: undefined,
+		reloadFrom: undefined,
 		redirect: undefined,
 		input,
 		recovery: undefined,
@@ -257,8 +261,16 @@ export const workerHostMachine = setup({
 		tagForm: undefined,
 		tagArticleId: ''
 	}),
-	output: ({ context }) => ({ outcome: 'closed', redirect: context.redirect }),
+	output: ({ context }) =>
+		context.reloadFrom
+			? { outcome: 'closed', redirect: undefined, reloadFrom: context.reloadFrom }
+			: { outcome: 'closed', redirect: context.redirect },
 	on: {
+		NEWER_BUILD: ({ context, event, value }, enq) => {
+			if (!matchesState({ running: 'accepting' }, value) || context.reloadFrom) return
+			enq.raise({ type: 'SHUTDOWN' })
+			return { context: { reloadFrom: event.build, redirect: undefined } }
+		},
 		RENDER: ({ context }) => ({ context: { renderRevision: context.renderRevision + 1 } }),
 		CLOSE_ISSUE: ({ context, event }) => ({
 			context: {

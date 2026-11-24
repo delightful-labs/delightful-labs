@@ -15,13 +15,35 @@ export function checkFinanceWorker(directory, finance, proof) {
 		mkdirSync(dirname(join(app, name)), { recursive: true })
 		cpSync(join(finance, name), join(app, name), { recursive: true })
 	}
+	// This fixture supplies service-worker framework modules in native.test.ts.
+	// Its standalone project has no SvelteKit-generated $app/tsconfig package.
+	writeFileSync(
+		join(app, 'src/service-worker/tsconfig.json'),
+		JSON.stringify(
+			{
+				extends: '../../tsconfig.json',
+				compilerOptions: {
+					module: 'ESNext',
+					moduleResolution: 'Bundler',
+					lib: ['ES2024', 'WebWorker']
+				},
+				include: ['./**/*.ts']
+			},
+			null,
+			2
+		) + '\n'
+	)
 
 	writeFileSync(
 		join(app, 'tsconfig.worker-application.json'),
 		JSON.stringify(
 			{
 				extends: './tsconfig.json',
-				compilerOptions: { module: 'ESNext', moduleResolution: 'Bundler' },
+				compilerOptions: {
+					module: 'ESNext',
+					moduleResolution: 'Bundler',
+					paths: { '$app/state': ['./tests/worker-application/route-state.svelte.ts'] }
+				},
 				include: [
 					'src/app.d.ts',
 					'src/lib/tdesign-icons.d.ts',

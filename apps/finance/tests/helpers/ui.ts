@@ -80,7 +80,18 @@ export async function selectWorkspace(selector: Locator, id: string) {
 	const page = selector.page()
 	await closeCreationModal(page)
 	await openSidebarSection(page, 'Settings')
-	await selector.selectOption(id)
+	if (
+		(await selector.inputValue()) !== id ||
+		new URL(page.url()).searchParams.get('workspace') !== id
+	) {
+		await Promise.all([
+			page.waitForEvent('framenavigated', {
+				predicate: (frame) =>
+					frame === page.mainFrame() && new URL(frame.url()).searchParams.get('workspace') === id
+			}),
+			selector.selectOption(id)
+		])
+	}
 	await expect(page).toHaveURL((url) => url.searchParams.get('workspace') === id)
 	await expect(selector).toHaveValue(id)
 }

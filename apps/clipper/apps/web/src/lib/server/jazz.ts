@@ -9,6 +9,7 @@ import permissions from '../backend/jazz/jazz.permissions.json' with { type: 'js
 // The local alpha.60 store has a separate path from the previous SDK's data.
 const store = process.env.VERCEL
 	? vercel({
+			region: 'iad1',
 			vcpus: 1,
 			maxDriveBytes: 1024 ** 3,
 			blobs: 'sqlite',

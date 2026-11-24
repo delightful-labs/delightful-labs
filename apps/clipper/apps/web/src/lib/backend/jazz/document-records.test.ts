@@ -8,6 +8,8 @@ import { createLibraryRecords } from './records.js'
 import { documentsQuery } from './queries.js'
 import { documentRecord, captureDocumentRecord } from './document-record.js'
 import { newDocumentValues } from './document-values.js'
+import type { LibraryArticle, CaptureDocument } from '../../contracts/articles.js'
+import { articleId } from '../../capture/source.js'
 let fixture: PolicyTestApp
 beforeAll(async () => {
 	fixture = await createPolicyTestApp(app, permissions, expect)
@@ -16,7 +18,11 @@ afterAll(async () => {
 	await fixture?.shutdown()
 })
 async function owner(name: string) {
-	const session = { user_id: name, authMode: 'local-first', claims: {} } satisfies PolicyTestSession
+	const session = {
+		user_id: name,
+		authMode: 'device-account',
+		claims: {}
+	} satisfies PolicyTestSession
 	const db = fixture.as(session),
 		id = fixture.accountFor(session)
 	await db
@@ -32,6 +38,85 @@ const content = {
 	siteName: 'Example',
 	provenance: '{}'
 }
+it('keeps native list and queue observers alive while capture metadata arrives after its document', async () => {
+	const account = await owner('late-capture-metadata')
+	const url = 'https://example.com/arriving'
+	const id = await articleId(account.id, url)
+	await account.db
+		.insert(app.libraryDocuments, newDocumentValues(id, account.id, url), { id })
+		.wait({ tier: 'global' })
+	let observed: LibraryArticle[] | undefined
+	let pending: CaptureDocument[] | undefined
+	let failed = false
+	const release = account.records.articles.subscribe(
+		(rows) => {
+			observed = rows
+		},
+		() => {
+			failed = true
+		}
+	)
+	const releasePending = account.records.articles.subscribePending(
+		(rows) => {
+			pending = rows
+		},
+		() => {
+			failed = true
+		}
+	)
+	try {
+		await expect.poll(() => ({ observed, pending })).toEqual({ observed: [], pending: [] })
+		expect(failed).toBe(false)
+		await account.db
+			.insert(
+				app.documentCaptures,
+				{ libraryId: account.id, documentId: id, operationId: null, failure: null },
+				{ id }
+			)
+			.wait({ tier: 'global' })
+		await expect.poll(() => observed?.map((row) => row.id)).toEqual([id])
+		await expect.poll(() => pending?.map((row) => row.id)).toEqual([id])
+		expect(observed?.[0]).toMatchObject({ url, readable: false, status: 'inbox' })
+		const saved = await toPromise(
+			createActor(account.records.articles.saveMachine, { input: { url, content } }).start()
+		)
+		expect(saved.kind).toBe('saved')
+		if (saved.kind !== 'saved') throw new Error('Expected native content completion')
+		await Promise.all(saved.receipts.map((receipt) => receipt.global()))
+		await expect.poll(() => pending).toEqual([])
+		await expect.poll(() => observed?.[0]?.readable).toBe(true)
+		expect(failed).toBe(false)
+	} finally {
+		releasePending()
+		release()
+	}
+})
+it('still refuses a capture whose identity does not match its document', async () => {
+	const account = await owner('mislinked-capture-metadata')
+	const id = crypto.randomUUID()
+	await account.db
+		.insert(app.libraryDocuments, newDocumentValues(id, account.id, null), { id })
+		.wait({ tier: 'global' })
+	await account.db
+		.insert(
+			app.documentCaptures,
+			{ libraryId: account.id, documentId: id, operationId: null, failure: null },
+			{ id: crypto.randomUUID() }
+		)
+		.wait({ tier: 'global' })
+	let failed = false
+	const release = account.records.articles.subscribe(
+		() => {},
+		() => {
+			failed = true
+		}
+	)
+	try {
+		await expect.poll(() => failed).toBe(true)
+	} finally {
+		release()
+	}
+})
 it('creates progress zero on URL-only saves and preserves Document state while attaching Article content', async () => {
 	const account = await owner('joined-document')
 	const url = 'https://short.example/story?q=1#passage'
