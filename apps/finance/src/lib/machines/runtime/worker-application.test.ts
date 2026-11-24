@@ -124,6 +124,9 @@ function fixture(
 		release: ReturnType<typeof vi.fn>
 	}[] = []
 	const recoveryRead = vi.fn(async () => 'fixture phrase')
+	const saveProfileName = vi.fn<Parameters<typeof createProfileFormOptions>[0]['saveName']>(
+		async () => {}
+	)
 	const navigate = vi.fn<WorkspaceNavigate>(async () => {})
 	const archiveWrite = vi.fn(async (_accountId: string) => {})
 	const createCategoryWrite = vi.fn<
@@ -317,7 +320,7 @@ function fixture(
 					profile: createProfileFormOptions({
 						binding,
 						observe: () => observe().profile,
-						saveName: vi.fn(async () => {}),
+						saveName: saveProfileName,
 						saveAvatar: vi.fn(async () => {})
 					}),
 					workspace: createWorkspaceRenameFormOptions({
@@ -434,6 +437,7 @@ function fixture(
 		archiveTagWrite,
 		navigate,
 		recoveryRead,
+		saveProfileName,
 		createWrite,
 		transactionDb,
 		enter: (command: WorkerFormCommand, scope = selectFinanceWorkerView(actor.getSnapshot())) =>
@@ -1328,6 +1332,42 @@ describe('Finance worker ownership and selected accounts', () => {
 			await Promise.resolve()
 			expect(initial.beginTransaction).not.toHaveBeenCalled()
 		} finally {
+			f.stop()
+		}
+	})
+
+	it('waits for an issued profile save in the identity owner before acknowledging clean native close', async () => {
+		const f = fixture(),
+			saved = Promise.withResolvers<void>()
+		f.saveProfileName.mockImplementation(() => saved.promise)
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			last(f.queries).publish([])
+			const scope = f.view()
+			f.actor.send({
+				type: 'PROFILE',
+				form: 'name',
+				command: { type: 'SUBMIT', values: { displayName: 'Saved identity' } },
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			await vi.waitFor(() => expect(f.saveProfileName).toHaveBeenCalledOnce())
+			f.actor.send({ type: 'CLOSE' })
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+			expect(f.actor.getSnapshot().output).toBeUndefined()
+			saved.resolve()
+			await waitFor(f.actor, (snapshot) => snapshot.status === 'done')
+			expect(f.saveProfileName).toHaveBeenCalledExactlyOnceWith(
+				'22222222-2222-4222-8222-222222222222',
+				userId,
+				'Saved identity'
+			)
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+		} finally {
+			saved.resolve()
 			f.stop()
 		}
 	})

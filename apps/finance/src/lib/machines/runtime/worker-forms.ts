@@ -1,4 +1,3 @@
-import { workerWorkspaceSeed } from '../workspaces/workspace-fake-data.js'
 import { createWorkerSamples } from '../samples/worker-samples.js'
 import { selectSampleTransactionsView } from '../samples/sample-transactions.js'
 import { workerSamplesView } from '../../contracts/worker-forms.js'
@@ -21,7 +20,7 @@ import {
 import type { WorkerBankHistoryCommand } from '../../contracts/worker-banks.js'
 import { createBankSyncMachine, selectBankReport } from '../bank-sync/index.js'
 import type { BankEvent } from '../bank-sync/types.js'
-import { workerBankView, type WorkerBankCommand } from '../../contracts/worker-banks.js'
+import { workerBankView } from '../../contracts/worker-banks.js'
 import { createCallbackLogic } from 'xstate'
 import type { Db as JazzDb } from 'jazz-tools'
 import {
@@ -83,10 +82,7 @@ import {
 } from '../workspaces/workspace-restore.js'
 import { workerBackupView, workerWorkspaceRestoreView } from '../../contracts/worker-backup.js'
 import type { BackupSubmission } from '../../backup/submission.js'
-import {
-	createWorkspaceCreationMachine,
-	selectWorkspaceCreationReport
-} from '../workspaces/workspace-creation.js'
+import { selectWorkspaceCreationReport } from '../workspaces/workspace-creation.js'
 import {
 	workerWorkspaceCreationView,
 	type WorkerWorkspaceCreationView,
@@ -98,7 +94,6 @@ import type { createWorkspaceRenameFormOptions } from '../workspaces/workspace-r
 import type { ProfileObservation } from '../../contracts/profile-contract.js'
 import type { WorkspaceRenameObservation } from '../../contracts/workspace-rename-contract.js'
 import {
-	workerProfileFormView,
 	workerProfileForms,
 	workerWorkspaceFormView,
 	type WorkerProfileForms,
@@ -127,8 +122,6 @@ import {
 	type OutputFrom
 } from 'xstate'
 import { workspaceInitialization } from '../workspaces/workspace-initialization.js'
-import { createWorkspaceStartupOwner } from 'delightful-local-first/workspace/startup'
-import type { WorkspaceInitializationReport } from 'delightful-local-first/workspace/startup-contracts'
 import { createAccountCreationFormOptions } from '../accounts/account-creation-access.js'
 import {
 	createScopedFormMachine,
@@ -156,55 +149,53 @@ import {
 	type FinanceFormsObservation
 } from '../../contracts/worker-forms.js'
 
+import {
+	createFinanceIdentityControlsMachine,
+	selectFinanceIdentityControls
+} from './worker-identity-controls.js'
+
 type InitializationResult = OutputFrom<typeof workspaceInitialization>
-const workspaceStartup = createWorkspaceStartupOwner<
-	InputFrom<typeof workspaceInitialization>,
-	InitializationResult,
-	SnapshotFrom<typeof workspaceInitialization>
->({
-	initialize: workspaceInitialization,
-	provenance: (result) =>
-		result.outcome === 'ready'
-			? { identityId: result.identityId, initialWorkspaceId: result.workspaceId }
-			: undefined
-})
+
+export type FinanceFormsDependencies = Omit<
+	Parameters<typeof createAccountCreationFormOptions>[0],
+	'observe'
+> & {
+	accountOrderStorage: AccountOrderStorage
+	transferDispatch: TransferMutationGateway['send']
+	creationKey: string
+	accountAccess: ReturnType<typeof createAccountDeleteGrantMachine>
+	backup: ReturnType<typeof createWorkspaceBackupMachine>
+	restore: ReturnType<typeof createWorkspaceRestoreController>
+	reload: () => void
+	navigate?: Parameters<typeof createTransactionEntryFormOptions>[0]['navigate']
+	profile: ReturnType<typeof createProfileFormOptions>
+	workspace: ReturnType<typeof createWorkspaceRenameFormOptions<() => Promise<void>>>
+	classification: Parameters<typeof createClassificationOwner>[0]
+	navigation: ReturnType<typeof createWorkspaceNavigationMachine>
+	archive: (accountId: string) => Promise<unknown>
+	initialization: InputFrom<typeof workspaceInitialization>
+	observe: () => FinanceFormsObservation
+	db: Pick<
+		JazzDb,
+		| 'all'
+		| 'one'
+		| 'subscribe'
+		| 'insert'
+		| 'insertStreaming'
+		| 'update'
+		| 'delete'
+		| 'beginTransaction'
+		| 'beginSerializableTransaction'
+		| 'transaction'
+		| 'getConfig'
+		| 'getAuthState'
+		| 'onMutationError'
+	>
+}
 
 /** One SDK-bound workflow owner. Local First owns startup; Finance retains domain policy. */
-export function createFinanceFormsMachine(
-	dependencies: Omit<Parameters<typeof createAccountCreationFormOptions>[0], 'observe'> & {
-		accountOrderStorage: AccountOrderStorage
-		transferDispatch: TransferMutationGateway['send']
-		creationKey: string
-		accountAccess: ReturnType<typeof createAccountDeleteGrantMachine>
-		backup: ReturnType<typeof createWorkspaceBackupMachine>
-		restore: ReturnType<typeof createWorkspaceRestoreController>
-		reload: () => void
-		navigate?: Parameters<typeof createTransactionEntryFormOptions>[0]['navigate']
-		profile: ReturnType<typeof createProfileFormOptions>
-		workspace: ReturnType<typeof createWorkspaceRenameFormOptions<() => Promise<void>>>
-		classification: Parameters<typeof createClassificationOwner>[0]
-		navigation: ReturnType<typeof createWorkspaceNavigationMachine>
-		archive: (accountId: string) => Promise<unknown>
-		initialization: InputFrom<typeof workspaceInitialization>
-		observe: () => FinanceFormsObservation
-		db: Pick<
-			JazzDb,
-			| 'all'
-			| 'one'
-			| 'subscribe'
-			| 'insert'
-			| 'insertStreaming'
-			| 'update'
-			| 'delete'
-			| 'beginTransaction'
-			| 'beginSerializableTransaction'
-			| 'transaction'
-			| 'getConfig'
-			| 'getAuthState'
-			| 'onMutationError'
-		>
-	}
-) {
+export function createFinanceFormsMachine(dependencies: FinanceFormsDependencies) {
+	const identity = createFinanceIdentityControlsMachine(dependencies)
 	const sampleIncome = createWorkerSamples(
 		dependencies.db,
 		INCOME,
@@ -229,19 +220,6 @@ export function createFinanceFormsMachine(
 	})
 	const transactionDetails = createWorkerTransactionDetails(dependencies.db)
 	const savedImageEditor = createSavedTransactionImageEditor(windowImageEditorMachine)
-	const workspaceCreation = createWorkspaceCreationMachine(dependencies.db)
-	function creationBinding(observation: FinanceFormsObservation) {
-		const profile = observation.profile
-		return profile.sessionReady &&
-			profile.binding === dependencies.binding &&
-			profile.identityId &&
-			profile.profile?.id &&
-			profile.profile.userId === profile.identityId
-			? { key: dependencies.creationKey, userId: profile.identityId, profileId: profile.profile.id }
-			: undefined
-	}
-	const profileName = createScopedFormMachine(dependencies.profile.name)
-	const profileAvatar = createScopedFormMachine(dependencies.profile.avatar)
 	const workspaceRename = createScopedFormMachine(dependencies.workspace)
 	const classification = createClassificationOwner(dependencies.classification)
 	const accountOrder = createAccountOrderPersistenceMachine(dependencies.accountOrderStorage)
@@ -344,7 +322,6 @@ export function createFinanceFormsMachine(
 		order: ReturnType<typeof selectPersistedAccountOrder>
 		navigation: NavigationReport | undefined
 		archive: ReturnType<typeof selectAccountArchiveReport> | undefined
-		seedClosed: boolean
 		initialization: InitializationResult | undefined
 		edit: TransactionEntryView | undefined
 		editObservation: TransactionEntryObservation | undefined
@@ -447,25 +424,16 @@ export function createFinanceFormsMachine(
 				ACCOUNT_ACCESS_CLOSED: types(),
 				BACKUP_CLOSED: types(),
 				WORKSPACE_RESTORE_CLOSED: types(),
-				WORKSPACE_CREATION_CLOSED: types(),
-				PROFILE_NAME_CLOSED: types(),
-				PROFILE_AVATAR_CLOSED: types(),
 				WORKSPACE_RENAME_CLOSED: types(),
-
 				CLASSIFICATION_CLOSED: types(),
-
 				CREATION_CLOSED: types(),
 				TRANSACTION_CLOSED: types(),
 				EDIT_CLOSED: types(),
-				INITIALIZATION_CLOSED: types(),
-				SEED_CLOSED: types(),
-				NAVIGATION_CLOSED: types(),
 				ARCHIVE_CLOSED: types(),
-				ORDER_CLOSED: types()
+				ORDER_CLOSED: types(),
+				IDENTITY_CLOSED: types()
 			},
 			events: {
-				WORKSPACE_INITIALIZATION_RESULT:
-					types<Omit<WorkspaceInitializationReport<InitializationResult>, 'type'>>(),
 				ADD_SAMPLES: types<{ kind: TransactionEntryObservation['kind'] }>(),
 				INTEGRITY_STATUS: types<{ report: IntegrityReport }>(),
 				RETRY_INTEGRITY: types(),
@@ -496,7 +464,7 @@ export function createFinanceFormsMachine(
 					command: WorkerFormCommand
 				}>(),
 				OBSERVE: types<Omit<Input, 'offline'>>(),
-				NAVIGATION_STATUS: types<{ report: NavigationReport }>(),
+
 				SELECT_WORKSPACE: types<{ workspaceId: string }>(),
 				NAVIGATE: types<{ destination: string; replace: boolean }>(),
 				RETRY_NAVIGATION: types(),
@@ -508,7 +476,6 @@ export function createFinanceFormsMachine(
 				SHUTDOWN: types()
 			},
 			children: {
-				seed: types<import('xstate').ActorRefFrom<typeof workerWorkspaceSeed>>(),
 				sampleIncome: types<import('xstate').ActorRefFrom<typeof sampleIncome>>(),
 				sampleExpense: types<import('xstate').ActorRefFrom<typeof sampleExpense>>(),
 				integrity: types<import('xstate').ActorRefFrom<typeof integrity>>(),
@@ -523,27 +490,17 @@ export function createFinanceFormsMachine(
 				accountAccess: types<import('xstate').ActorRefFrom<typeof dependencies.accountAccess>>(),
 				backup: types<import('xstate').ActorRefFrom<typeof dependencies.backup>>(),
 				workspaceRestore: types<import('xstate').ActorRefFrom<typeof dependencies.restore>>(),
-				workspaceCreation: types<import('xstate').ActorRefFrom<typeof workspaceCreation>>(),
-				profileName: types<import('xstate').ActorRefFrom<typeof profileName>>(),
-				profileAvatar: types<import('xstate').ActorRefFrom<typeof profileAvatar>>(),
 				workspaceRename: types<import('xstate').ActorRefFrom<typeof workspaceRename>>(),
-
 				classification: types<import('xstate').ActorRefFrom<typeof classification.logic>>(),
-
 				order: types<import('xstate').ActorRefFrom<typeof accountOrder>>(),
-				navigation:
-					types<
-						import('xstate').ActorRefFrom<ReturnType<typeof createWorkspaceNavigationMachine>>
-					>(),
 				archive: types<import('xstate').ActorRefFrom<typeof archive>>(),
-				initialization: types<import('xstate').ActorRefFrom<typeof workspaceStartup>>(),
 				edit: types<import('xstate').ActorRefFrom<typeof editTransaction>>(),
 				creation: types<import('xstate').ActorRefFrom<typeof createAccount>>(),
-				transaction: types<import('xstate').ActorRefFrom<typeof enterTransaction>>()
+				transaction: types<import('xstate').ActorRefFrom<typeof enterTransaction>>(),
+				identity: types<import('xstate').ActorRefFrom<typeof identity>>()
 			}
 		},
 		actors: {
-			seed: workerWorkspaceSeed,
 			sampleIncome,
 			sampleExpense,
 			integrity,
@@ -558,20 +515,14 @@ export function createFinanceFormsMachine(
 			accountAccess: dependencies.accountAccess,
 			backup: dependencies.backup,
 			workspaceRestore: dependencies.restore,
-			workspaceCreation,
-			profileName,
-			profileAvatar,
 			workspaceRename,
-
 			classification: classification.logic,
-
 			accountOrder,
 			createAccount,
 			enterTransaction,
 			editTransaction,
-			workspaceStartup,
 			archive,
-			navigation: dependencies.navigation
+			identity
 		}
 	}).createMachine({
 		id: 'finance-forms',
@@ -608,7 +559,6 @@ export function createFinanceFormsMachine(
 			navigation: undefined,
 			archive: undefined,
 			initialization: undefined,
-			seedClosed: false,
 			edit: undefined,
 			editObservation: undefined,
 			creation: undefined,
@@ -847,67 +797,6 @@ export function createFinanceFormsMachine(
 				onError: { target: '.failed' }
 			},
 			{
-				id: 'workspaceCreation',
-				src: 'workspaceCreation',
-				input: ({ context }) => ({ binding: creationBinding(context.observation) }),
-				onSnapshot: ({ event }) => ({
-					context: { workspaceCreation: selectWorkspaceCreationReport(event.snapshot) }
-				}),
-				onDone: ({ value }, enq) => {
-					if (!matchesState('closing', value)) return { target: '.failed' }
-					enq.raise({ type: 'WORKSPACE_CREATION_CLOSED' })
-				},
-				onError: { target: '.failed' }
-			},
-			{
-				id: 'profileName',
-				src: 'profileName',
-				input: ({ context }) => context.observation.profile,
-				onSnapshot: ({ context, event }) => {
-					if (selectScopedFormObservation(event.snapshot) !== context.observation.profile) return
-					const view = workerProfileFormView.safeParse(
-						selectScopedFormView(event.snapshot, dependencies.profile.name)
-					)
-					return view.success
-						? {
-								context: {
-									profileName: view.data,
-									profileNameObservation: context.observation.profile
-								}
-							}
-						: { target: '.failed' }
-				},
-				onDone: ({ value }, enq) => {
-					if (!matchesState('closing', value)) return { target: '.failed' }
-					enq.raise({ type: 'PROFILE_NAME_CLOSED' })
-				},
-				onError: { target: '.failed' }
-			},
-			{
-				id: 'profileAvatar',
-				src: 'profileAvatar',
-				input: ({ context }) => context.observation.profile,
-				onSnapshot: ({ context, event }) => {
-					if (selectScopedFormObservation(event.snapshot) !== context.observation.profile) return
-					const view = workerProfileFormView.safeParse(
-						selectScopedFormView(event.snapshot, dependencies.profile.avatar)
-					)
-					return view.success
-						? {
-								context: {
-									profileAvatar: view.data,
-									profileAvatarObservation: context.observation.profile
-								}
-							}
-						: { target: '.failed' }
-				},
-				onDone: ({ value }, enq) => {
-					if (!matchesState('closing', value)) return { target: '.failed' }
-					enq.raise({ type: 'PROFILE_AVATAR_CLOSED' })
-				},
-				onError: { target: '.failed' }
-			},
-			{
 				id: 'workspaceRename',
 				src: 'workspaceRename',
 				input: ({ context }) => context.observation.workspace,
@@ -963,16 +852,6 @@ export function createFinanceFormsMachine(
 				onError: { target: '.failed' }
 			},
 			{
-				id: 'navigation',
-				src: 'navigation',
-				input: ({ context, self }) => ({ facts: context.observation.navigation, recipient: self }),
-				onDone: ({ value }, enq) => {
-					if (!matchesState('closing', value)) return { target: '.failed' }
-					enq.raise({ type: 'NAVIGATION_CLOSED' })
-				},
-				onError: { target: '.failed' }
-			},
-			{
 				id: 'archive',
 				src: 'archive',
 				onSnapshot: ({ context, event }) => {
@@ -986,33 +865,6 @@ export function createFinanceFormsMachine(
 				onDone: ({ value }, enq) => {
 					if (!matchesState('closing', value)) return { target: '.failed' }
 					enq.raise({ type: 'ARCHIVE_CLOSED' })
-				},
-				onError: { target: '.failed' }
-			},
-			{
-				id: 'seed',
-				src: 'seed',
-				input: () => ({ db: dependencies.db, userId: dependencies.initialization.userId }),
-				onDone: ({ event, value }, enq) => {
-					if (event.output.outcome !== 'closed') return { target: '.failed' }
-					if (matchesState('closing', value)) enq.raise({ type: 'SEED_CLOSED' })
-					return { context: { seedClosed: true } }
-				},
-				onError: { target: '.failed' }
-			},
-			{
-				id: 'initialization',
-				src: 'workspaceStartup',
-				input: ({ self }) => ({
-					binding: dependencies.binding,
-					initialization: dependencies.initialization,
-					recipient: self
-				}),
-				onDone: ({ value, event }, enq) => {
-					if (!matchesState('closing', value) || event.output.outcome !== 'closed')
-						return { target: '.failed' }
-					enq.raise({ type: 'INITIALIZATION_CLOSED' })
-					return { context: { initialization: event.output.initialization } }
 				},
 				onError: { target: '.failed' }
 			},
@@ -1124,6 +976,31 @@ export function createFinanceFormsMachine(
 					enq.raise({ type: 'EDIT_CLOSED' })
 				},
 				onError: { target: '.failed', context: { edit: undefined } }
+			},
+			{
+				id: 'identity',
+				src: 'identity',
+				input: ({ context }) => ({
+					observation: context.observation,
+					selectionRevision: context.selectionRevision
+				}),
+				onSnapshot: ({ context, event, value }, enq) => {
+					const identity = selectFinanceIdentityControls(event.snapshot)
+					const { status, ...facts } = identity
+					if (status === 'failed') return { target: '.failed', context: facts }
+					if (identity.initialization === context.initialization) return { context: facts }
+					const request = {
+						generation: context.integrityRequest.generation + 1,
+						binding: integrityBinding(context.observation, identity.initialization)
+					}
+					if (matchesState('active', value)) enq.sendTo('integrity', { type: 'OBSERVED', request })
+					return { context: { ...facts, integrityRequest: request, integrityReport: undefined } }
+				},
+				onDone: ({ value }, enq) => {
+					if (!matchesState('closing', value)) return { target: '.failed' }
+					enq.raise({ type: 'IDENTITY_CLOSED' })
+				},
+				onError: { target: '.failed' }
 			}
 		],
 		states: {
@@ -1134,26 +1011,6 @@ export function createFinanceFormsMachine(
 					enq.sendTo('bank', { type: 'SOURCE_OBSERVED', source: bankSource(context) })
 				},
 				on: {
-					WORKSPACE_INITIALIZATION_RESULT: ({ context, event }, enq) => {
-						if (event.binding !== dependencies.binding) return
-						if (event.provenance)
-							enq.sendTo('seed', {
-								type: 'INITIALIZED',
-								workspaceId: event.provenance.initialWorkspaceId
-							})
-						const request = {
-							generation: context.integrityRequest.generation + 1,
-							binding: integrityBinding(context.observation, event.initialization)
-						}
-						enq.sendTo('integrity', { type: 'OBSERVED', request })
-						return {
-							context: {
-								initialization: event.initialization,
-								integrityRequest: request,
-								integrityReport: undefined
-							}
-						}
-					},
 					TRANSFER_MUTATION_REQUEST: ({ context, event }, enq) => {
 						const current = transferScope(context.observation)
 						const request = event.request
@@ -1230,14 +1087,10 @@ export function createFinanceFormsMachine(
 						if (command.type === 'REMOVE') enq.sendTo('imageRemovals', command)
 						else enq.sendTo('savedImages', command)
 					},
-					NAVIGATION_STATUS: ({ context, event }) =>
-						event.report.generation === context.observation.navigation.generation
-							? { context: { navigation: event.report } }
-							: undefined,
-					SELECT_WORKSPACE: ({ event }, enq) =>
-						enq.sendTo('navigation', { type: 'SELECT', workspaceId: event.workspaceId }),
-					NAVIGATE: ({ event }, enq) => enq.sendTo('navigation', event),
-					RETRY_NAVIGATION: (_, enq) => enq.sendTo('navigation', { type: 'RETRY' }),
+
+					SELECT_WORKSPACE: ({ event }, enq) => enq.sendTo('identity', event),
+					NAVIGATE: ({ event }, enq) => enq.sendTo('identity', event),
+					RETRY_NAVIGATION: ({ event }, enq) => enq.sendTo('identity', event),
 					OBSERVE: ({ context, event }, enq) => {
 						if (
 							context.observation.transaction.binding !== event.observation.transaction.binding ||
@@ -1314,17 +1167,15 @@ export function createFinanceFormsMachine(
 							observation: event.observation.accountAccess
 						})
 						enq.sendTo('backup', { type: 'OBSERVE', facts: event.observation.backup })
-						enq.sendTo('workspaceCreation', {
-							type: 'OBSERVED',
-							binding: creationBinding(event.observation)
+						enq.sendTo('identity', {
+							type: 'OBSERVE',
+							observation: event.observation,
+							selectionRevision: event.selectionRevision
 						})
-						enq.sendTo('profileName', { type: 'OBSERVE', observation: event.observation.profile })
-						enq.sendTo('profileAvatar', { type: 'OBSERVE', observation: event.observation.profile })
 						enq.sendTo('workspaceRename', {
 							type: 'OBSERVE',
 							observation: event.observation.workspace
 						})
-						enq.sendTo('navigation', { type: 'OBSERVED', facts: event.observation.navigation })
 						enq.sendTo('archive', { type: 'OBSERVE', observation: event.observation.archive })
 						enq.sendTo('order', { type: 'OBSERVE', observation: event.observation.order })
 						if (event.observation.navigation.pathname !== context.observation.navigation.pathname) {
@@ -1383,9 +1234,8 @@ export function createFinanceFormsMachine(
 						}
 						enq.sendTo('workspaceRestore', { type: event.command })
 					},
-					WORKSPACE_CREATION: ({ event }, enq) => enq.sendTo('workspaceCreation', event.command),
-					PROFILE: ({ event }, enq) =>
-						enq.sendTo(event.form === 'name' ? 'profileName' : 'profileAvatar', event.command),
+					WORKSPACE_CREATION: ({ event }, enq) => enq.sendTo('identity', event),
+					PROFILE: ({ event }, enq) => enq.sendTo('identity', event),
 					WORKSPACE_SETTINGS: ({ event }, enq) => enq.sendTo('workspaceRename', event.command),
 					CLASSIFICATION: ({ event }, enq) => enq.sendTo('classification', event),
 					ACCOUNT_ORDER: ({ event }, enq) => {
@@ -1400,11 +1250,8 @@ export function createFinanceFormsMachine(
 					TRANSACTION_ENTRY: ({ event }, enq) => {
 						enq.sendTo('transaction', event.command)
 					},
-					SHUTDOWN: ({ self, context }, enq) => {
-						const seed = self.getSnapshot().children.seed
-						if (seed?.getSnapshot().status === 'active') enq.sendTo(seed, { type: 'SHUTDOWN' })
-						enq.sendTo('initialization', { type: 'SHUTDOWN' })
-						enq.sendTo('navigation', { type: 'SHUTDOWN' })
+					SHUTDOWN: ({ context }, enq) => {
+						enq.sendTo('identity', { type: 'SHUTDOWN' })
 						enq.sendTo('archive', { type: 'SHUTDOWN' })
 						enq.sendTo('order', { type: 'SHUTDOWN' })
 						enq.sendTo('accountAccess', { type: 'SHUTDOWN' })
@@ -1412,9 +1259,6 @@ export function createFinanceFormsMachine(
 						enq.sendTo('workspaceRestore', { type: 'DRAIN' })
 						if (context.workspaceRestore && !context.workspaceRestore.busy)
 							enq.raise({ type: 'WORKSPACE_RESTORE_CLOSED' })
-						enq.sendTo('workspaceCreation', { type: 'SHUTDOWN' })
-						enq.sendTo('profileName', { type: 'SHUTDOWN' })
-						enq.sendTo('profileAvatar', { type: 'SHUTDOWN' })
 						enq.sendTo('workspaceRename', { type: 'SHUTDOWN' })
 
 						enq.sendTo('classification', { type: 'SHUTDOWN' })
@@ -1438,7 +1282,7 @@ export function createFinanceFormsMachine(
 			},
 			closing: {
 				type: 'parallel',
-				on: { SHUTDOWN: {}, NAVIGATION_STATUS: {} },
+				on: { SHUTDOWN: {} },
 				onDone: { target: 'closed' },
 				states: {
 					sampleIncome: {
@@ -1511,31 +1355,10 @@ export function createFinanceFormsMachine(
 							closed: { type: 'final' }
 						}
 					},
-					profileName: {
-						initial: 'waiting',
-						states: {
-							waiting: { on: { PROFILE_NAME_CLOSED: { target: 'closed' } } },
-							closed: { type: 'final' }
-						}
-					},
-					profileAvatar: {
-						initial: 'waiting',
-						states: {
-							waiting: { on: { PROFILE_AVATAR_CLOSED: { target: 'closed' } } },
-							closed: { type: 'final' }
-						}
-					},
 					workspaceRename: {
 						initial: 'waiting',
 						states: {
 							waiting: { on: { WORKSPACE_RENAME_CLOSED: { target: 'closed' } } },
-							closed: { type: 'final' }
-						}
-					},
-					workspaceCreation: {
-						initial: 'waiting',
-						states: {
-							waiting: { on: { WORKSPACE_CREATION_CLOSED: { target: 'closed' } } },
 							closed: { type: 'final' }
 						}
 					},
@@ -1574,35 +1397,10 @@ export function createFinanceFormsMachine(
 							closed: { type: 'final' }
 						}
 					},
-					navigation: {
-						initial: 'waiting',
-						states: {
-							waiting: { on: { NAVIGATION_CLOSED: { target: 'closed' } } },
-							closed: { type: 'final' }
-						}
-					},
 					archive: {
 						initial: 'waiting',
 						states: {
 							waiting: { on: { ARCHIVE_CLOSED: { target: 'closed' } } },
-							closed: { type: 'final' }
-						}
-					},
-					seed: {
-						initial: 'assessing',
-						states: {
-							assessing: {
-								type: 'choice',
-								choice: ({ context }) => ({ target: context.seedClosed ? 'closed' : 'waiting' })
-							},
-							waiting: { on: { SEED_CLOSED: { target: 'closed' } } },
-							closed: { type: 'final' }
-						}
-					},
-					initialization: {
-						initial: 'waiting',
-						states: {
-							waiting: { on: { INITIALIZATION_CLOSED: { target: 'closed' } } },
 							closed: { type: 'final' }
 						}
 					},
@@ -1624,6 +1422,13 @@ export function createFinanceFormsMachine(
 						initial: 'waiting',
 						states: {
 							waiting: { on: { TRANSACTION_CLOSED: { target: 'closed' } } },
+							closed: { type: 'final' }
+						}
+					},
+					identity: {
+						initial: 'waiting',
+						states: {
+							waiting: { on: { IDENTITY_CLOSED: { target: 'closed' } } },
 							closed: { type: 'final' }
 						}
 					}

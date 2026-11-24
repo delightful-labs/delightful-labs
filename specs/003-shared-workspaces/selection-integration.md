@@ -200,3 +200,35 @@ workspace-creation binding and navigation generations. This extraction does not
 create new authorization policy, rewrite domain operations, or add a second SDK
 owner. It prepares the same financial group for the existing DLF selector's lease
 and drain contract while identity controls remain available independently.
+
+## Shared selected-resource composition
+
+The shared composition will invoke the existing DLF selection machine for one
+fixed native attachment. It forwards scoped target/access intent and owns one
+app-supplied resource actor for the selected lease. The app supplies the concrete
+actor logic, a pure lease-to-input projection, a supported shutdown command,
+a pure public-view projection and a pure classification of its terminal receipt.
+Schemas, role policy, financial operations and library work remain in their apps.
+
+Its states distinguish waiting, holding an admitted resource, invalidated/draining,
+closing and unresolved release. A scope-invalidated report withdraws admission
+before drain. The exact selector drain token is retained while shutdown is sent
+once to the original resource. Only its successful terminal receipt acknowledges
+that token. New selection/access observations can update the existing selector's
+pending intent while the original resource drains; they cannot instantiate a
+replacement early. Same-workspace route changes update the admitted app resource
+without selecting a new workspace lease.
+
+Unexpected resource completion/crash or an unresolved receipt cannot fabricate
+release. Shutdown takes precedence over pending replacement, including during
+construction and drain. The shared owner must retain the failed/original receipt
+and return an unresolved outcome, preventing clean native close or another
+resource acquisition. Public view reports carry the exact lease. App command
+admission checks the current lease/target before targeting the concrete typed
+resource actor; generic event registries or erased actor references are unnecessary.
+
+Finance's extracted identity controller remains outside this composition. Its
+financial controller and content observers become the app-supplied resource group.
+Clipper supplies its existing library shutdown receipt and domain observations to
+the same implementation. Production adoption must remove the corresponding manual
+replacement/drain decisions in both apps rather than leaving competing owners.

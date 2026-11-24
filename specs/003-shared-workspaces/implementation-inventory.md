@@ -684,3 +684,32 @@ whitespace checks passed. Hosted qualification must be checked for the new head.
 The session-bound forms owner is unchanged. Financial operation drain/identity
 controller separation and actual DLF workspace lease adoption remain required;
 this observation-lifetime prerequisite does not claim those are complete.
+
+## Identity controller group extraction
+
+`worker-identity-controls.ts` now owns the existing startup, optional seed,
+workspace creation, profile-name/avatar and navigation children. Its public
+selector reports only identity facts and its observed lifecycle. It preserves
+Finance's profile schemas, creation binding, navigation generations, startup
+provenance and each child's exact supported shutdown/result protocol. The shared
+DLF startup/seed implementations are unchanged.
+
+`worker-forms.ts` composes this owner with its financial children through the
+existing combined public view. It forwards typed identity commands/observations,
+consumes initialization facts to update financial integrity, and waits for one
+aggregate identity-close receipt alongside the existing financial receipts.
+A failed identity group or unresolved startup/seed result cannot acknowledge clean
+native close. The child still has the combined forms owner's lifetime in this
+extraction; lifting it outside the leased financial group remains the next step.
+
+The 105 worker tests pass, including a new production-parent test holding a
+profile save across host close. Native SDK/store closure waits for the issued
+save and the identity group's real aggregate receipt. Existing held startup,
+unknown settlement, navigation, restoration and financial drain cases also pass.
+Final source and test-fixture type checks passed with zero Svelte errors/warnings.
+Formatting/whitespace checks passed. Native qualification passed 62 browser cases:
+49 workspace/permission/profile-form cases, four cold/offline/unanswered-authority/
+later-permission-rejection cases, and nine native worker cases across Chromium,
+Firefox and WebKit (initialization/offline marker reuse, navigation drain and held
+archive before native close). All retained their existing assertions/timeouts;
+no retries were needed. New-head hosted qualification remains separate.
