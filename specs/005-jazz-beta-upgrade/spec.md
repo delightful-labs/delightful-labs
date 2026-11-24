@@ -819,6 +819,16 @@ collector preserves partial diagnostic results without an unhandled rejection.
 Test TypeScript and the five permission cases with two workers pass after that
 test-only change. On the corrective source commit, Foundation and Clipper have
 passed again; Finance's hosted startup and complete workspace scopes also pass.
+All 18 Finance jobs on corrective source `995f80c7` ultimately reported success,
+including the last application-2 shard's 87 cases. The complete same shard also
+passed locally with CI's two-worker setting (87 cases, 2.3 minutes), including
+the original unlink assertions and imported offline edits. The hosted shard took
+11.2 minutes. Its run was superseded and the overall workflow was marked canceled;
+individual job conclusions and logs were verified through both the connector and
+GitHub's API before reporting these passes. A planned cancellation refused that
+already-completed run; only two obsolete documentation-head workflows were
+explicitly canceled. The final head's CI refresh remains separate evidence in
+the linked checks. No canceled or queued check is reported as passing.
 
 The maintained fixture commands run from `apps/finance`:
 
