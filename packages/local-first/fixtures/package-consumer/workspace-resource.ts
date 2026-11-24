@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict'
-import { createActor, setup, types, type EventFromLogic, type SnapshotFrom } from 'xstate'
+import {
+	createActor,
+	setup,
+	types,
+	type EventFromLogic,
+	type SendableEventFromLogic,
+	type SnapshotFrom
+} from 'xstate'
 import { createWorkspaceResourceOwner } from 'delightful-local-first/workspace/resource'
 import type { WorkspaceLease } from 'delightful-local-first/workspace/contracts'
 import type { WorkspaceResourceInput } from 'delightful-local-first/workspace/resource-contracts'
@@ -14,7 +21,8 @@ const resource = setup({
 		input: types<Input>(),
 		context: types<Input & { value: number }>(),
 		output: types<{ clean: true }>(),
-		events: { SHUTDOWN: types(), RELEASE: types(), VALUE: types<{ value: number }>() }
+		events: { SHUTDOWN: types(), RELEASE: types(), VALUE: types<{ value: number }>() },
+		internalEvents: { INTERNAL_BOOKKEEPING: types() }
 	}
 }).createMachine({
 	initial: 'active',
@@ -47,7 +55,8 @@ const owner = createWorkspaceResourceOwner<
 	Input,
 	EventFromLogic<typeof resource>,
 	SnapshotFrom<typeof resource>,
-	{ value: number; label: string }
+	{ value: number; label: string },
+	SendableEventFromLogic<typeof resource>
 >({
 	resource,
 	input: (lease, binding) => ({ lease, label: binding.label }),
@@ -97,6 +106,8 @@ function invalidCommands(lease: WorkspaceLease) {
 	actor.send({ type: 'RESOURCE_COMMAND', lease, command: { type: 'VALUE', value: 'wrong' } })
 	// @ts-expect-error The owner alone issues resource shutdown after obtaining its drain token.
 	actor.send({ type: 'RESOURCE_COMMAND', lease, command: { type: 'SHUTDOWN' } })
+	// @ts-expect-error Resource internal coordination is not an externally admitted command.
+	actor.send({ type: 'RESOURCE_COMMAND', lease, command: { type: 'INTERNAL_BOOKKEEPING' } })
 	// @ts-expect-error A caller cannot acknowledge a resource drain on the owner's behalf.
 	actor.send({ type: 'DRAINED', drain: { token: {}, lease } })
 }

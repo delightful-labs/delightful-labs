@@ -11,7 +11,9 @@ a pure failed-snapshot classification and a terminal receipt classification.
 The app keeps its schemas, authorization, storage and domain operation drains.
 The resource must honor shutdown across its own acquisition and issued operations.
 
-Use the actor's complete event, input, output and snapshot types. With the pinned
+Use the actor's complete event, input, output and snapshot types. The final
+`SendableEventFromLogic` parameter restricts caller commands to public events,
+excluding self-only internal coordination while retaining the full invocation type. With the pinned
 XState beta, explicit producer generics preserve the concrete contracts:
 
 ```ts
@@ -20,7 +22,8 @@ const owner = createWorkspaceResourceOwner<
 	InputFrom<typeof resource>,
 	EventFromLogic<typeof resource>,
 	SnapshotFrom<typeof resource>,
-	ResourceView
+	ResourceView,
+ SendableEventFromLogic<typeof resource>
 >({
 	resource,
 	input: (lease, binding) => ({ lease, binding }),

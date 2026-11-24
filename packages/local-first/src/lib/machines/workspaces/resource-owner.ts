@@ -59,21 +59,25 @@ export function createWorkspaceResourceOwner<
 	ResourceInput,
 	Event extends { type: string },
 	S extends Snapshot<unknown>,
-	View
+	View,
+	CommandEvent extends Event = Event
 >(options: {
 	resource: ActorLogic<S, Event, ResourceInput>
 	input: (lease: WorkspaceLease, binding: Binding) => ResourceInput
-	shutdown: NoInfer<Extract<Event, { type: 'SHUTDOWN' }>>
+	shutdown: NoInfer<Extract<CommandEvent, { type: 'SHUTDOWN' }>>
 	view: (snapshot: NoInfer<S>) => View
 	failed: (snapshot: NoInfer<S>) => boolean
 	settlement: (
 		output: OutputFrom<ActorLogic<S, Event, ResourceInput>> | undefined
 	) => 'released' | 'unresolved'
 	/** Release/reject an app-owned payload when its lease cannot admit the command. */
-	refused?: (command: NoInfer<Exclude<Event, { type: 'SHUTDOWN' }>>, binding: Binding) => void
+	refused?: (
+		command: NoInfer<Exclude<CommandEvent, { type: 'SHUTDOWN' }>>,
+		binding: Binding
+	) => void
 }) {
 	type Result = OutputFrom<typeof options.resource>
-	type Command = WorkspaceResourceCommand<Event>
+	type Command = WorkspaceResourceCommand<CommandEvent>
 	type Context = {
 		record: {
 			input: WorkspaceResourceInput<Binding>

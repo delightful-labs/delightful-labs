@@ -814,3 +814,30 @@ changes were needed. DLF adds six observation cases, including 100 generated
 release/stop schedules (seed 20261126). All 1,346 DLF tests across 66 files pass.
 Final complete source/Svelte/test types, package/publint, complete public and
 packed-consumer execution, scoped lint/formatting and workspace links pass.
+
+## Concrete Finance workspace resource composition
+
+`worker-workspace-resources.ts` combines the existing financial controller owner
+and content query owner for one immutable workspace lease. It waits for matching
+binding/target observations before constructing either child. Financial controllers
+outlive subordinate route-read replacement; old queries must return actual release
+receipts before the latest route reads can start. Shutdown wins pending route
+replacement and waits for both terminal receipts. Query disposal failure, financial
+failure or unsolicited child completion retains unresolved custody and live
+siblings. The public projection retains exact observation/read correlation.
+
+Five new concrete-actor cases pass alongside the existing worker/query coverage
+(118 cases total). They prove matching observation admission, retained financial
+identity across query replacement, ignored retired callbacks, real cleanup before
+clean closure, disposal failure and live sibling retention after unsolicited
+financial/query completion. Full Finance source/Svelte/test types pass. This group
+is not yet wired into the production native composition; its production and native
+qualification follows with shared lease adoption. The fixture constructs the same
+public financial-group producer instead of reading framework implementation fields.
+
+The public DLF resource producer also distinguishes its full actor event type from
+its externally sendable command type. The latter excludes XState internal events;
+it cannot replace the full invocation type because the pinned actor scope retains
+that internal protocol. The checked packed consumer includes a real internal event
+and rejects attempts to send it through the lease envelope. No casts or framework
+patches are used.

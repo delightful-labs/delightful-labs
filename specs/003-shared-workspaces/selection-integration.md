@@ -303,3 +303,42 @@ another source; missing receipts cannot establish closure. Existing access sourc
 remain independent and preserve their stop-only host-cleanup boundary. This is a
 prerequisite to moving these queries inside the leased domain resource, not proof
 of production lease adoption by itself.
+
+## Finance production lease wiring details
+
+The next batch changes the native `worker-forms.ts` composition, introduces
+`worker-workspace-resources.ts`, moves the application's query invocation under
+that group, and adjusts the existing typed native producer/contract/fixtures.
+Identity controls and access observers retain their independent lifetimes.
+
+A newly leased resource starts waiting for a correlated observation. Its input
+is the immutable lease; it does not retain the first workspace's observations in
+a fixed native-binding payload. The native composition supplies current forms,
+initialization, network and read-scope facts through an admitted command. Only a
+matching native binding and explicit workspace target may construct financial
+controllers and content queries. This avoids both stale construction inputs on
+replacement and an access/content circular dependency.
+
+The resource group owns financial controllers above its content-read scope. A
+same-workspace route change drains the old queries through their actual receipts,
+then replaces only those queries, retaining the financial controllers and their
+issued operations. Newer route facts replace pending read intent. Host shutdown
+wins query replacement and waits for both real group receipts. Missing receipts,
+query cleanup failure, financial failure or unexpected completion retain unresolved
+custody and cannot start a replacement. Read failure with released subscriptions
+remains a data failure, not loss of independently observed membership.
+
+The composition forwards target/access intent to the existing shared selector;
+it does not choose replacement itself. Target attempts and observation generations
+remain separate from UI route revisions. Global routes suspend content selection
+while profile/workspace creation/navigation remain live. Membership classification
+is extracted from Finance's existing native predicate, rather than duplicated or
+inferred from directory completeness.
+
+Content publications include the admitted lease and read binding. The application
+consumes only its current public forms lease, native binding, target and read scope,
+with current allowed access evidence. Access invalidation clears admitted content
+immediately. This also rejects late A reports after A → B → A or revocation/regrant
+without confusing a route revision with a lease epoch. Publication compares exact
+fact references to avoid an observation/view feedback loop. Resource commands with
+owned file/transfer payloads use the shared owner's app-supplied refusal cleanup.

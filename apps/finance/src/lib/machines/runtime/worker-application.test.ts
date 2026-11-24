@@ -41,8 +41,18 @@ import { creationFixture as workspaceCreationFixture } from '../workspaces/works
 import type { InputFrom } from 'xstate'
 import type { workspaceInitialization } from '../workspaces/workspace-initialization.js'
 import { creationFixture } from '../transactions/transaction-create.fixture.js'
-import { createFinanceFormsMachine, selectFinanceFormsView } from './worker-forms.js'
+import {
+	createFinanceFormsMachine,
+	createFinanceFormGroups,
+	selectFinanceFormsView,
+	type FinanceFormsDependencies
+} from './worker-forms.js'
 import { app } from '../../queries.js'
+import {
+	createFinanceWorkspaceResources,
+	selectFinanceWorkspaceResources,
+	type FinanceResourceObservation
+} from './worker-workspace-resources.js'
 import type { WorkerFormCommand } from '../../contracts/worker-forms.js'
 import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
 import {
@@ -291,6 +301,11 @@ function fixture(
 		readRecoveryPhrase: recoveryRead,
 		archiveAccount: archiveWrite
 	}
+	let capturedForms: FinanceFormsDependencies | undefined
+	const buildForms = (dependencies: FinanceFormsDependencies) => {
+		capturedForms = dependencies
+		return createFinanceFormsMachine(dependencies)
+	}
 	const ready = (
 		binding: object
 	): Extract<SessionRuntimeObservation<FinanceWorkerCapabilities>, { status: 'ready' }> => ({
@@ -302,7 +317,7 @@ function fixture(
 		capabilities: {
 			...capabilities,
 			createForms: (observe, _archive, navigate, accountOrderStorage, transferDispatch) =>
-				createFinanceFormsMachine({
+				buildForms({
 					transferDispatch,
 					creationKey: JSON.stringify(['unit', userId]),
 					accountAccess: createAccountDeleteGrantMachine(
@@ -460,6 +475,10 @@ function fixture(
 				selection: scope.selection,
 				sessionRevision: scope.sessionRevision
 			}),
+		financialGroup: () => {
+			if (!capturedForms) throw new Error('Missing fixture form producer')
+			return createFinanceFormGroups(capturedForms).financial
+		},
 		start,
 		select,
 		ready,
@@ -3308,4 +3327,186 @@ describe('ordered provider sign-out', () => {
 			}
 		}
 	)
+})
+
+describe('Finance leased domain resource group', () => {
+	function resources(fault?: 'disposal') {
+		const f = fixture(),
+			binding = {},
+			capabilities = f.ready(binding).capabilities
+		const baseline = selectFinanceFormObservations(undefined)
+		const forms = {
+			...baseline,
+			profile: { ...baseline.profile, binding },
+			archive: { ...baseline.archive, organizationId: a }
+		}
+		const observation: FinanceResourceObservation = {
+			forms: {
+				observation: forms,
+				selectionRevision: 1,
+				offline: false,
+				initialization: undefined
+			},
+			read: { binding: {}, selection: { workspaceId: a, revision: 1 }, transactionId: null }
+		}
+		capabilities.createForms(
+			() => forms,
+			capabilities.archiveAccount,
+			f.navigate,
+			{ read: async () => [], write: async () => {} },
+			() => {},
+			false
+		)
+		const financial = f.financialGroup()
+		const reportDisposalFailure = vi.fn()
+		const logic = createFinanceWorkspaceResources({
+			financial,
+			capabilities: fault
+				? {
+						...capabilities,
+						observeAccounts: (_id, publish) => {
+							publish([])
+							return () => {
+								throw new Error('Native release failed')
+							}
+						}
+					}
+				: capabilities,
+			reportDisposalFailure
+		})
+		const lease = {
+			scope: { binding, attachment: {} },
+			request: { workspaceId: a, attempt: 1 },
+			epoch: 1
+		}
+		const actor = createActor(logic, { input: { lease } }).start()
+		return {
+			f,
+			actor,
+			observation,
+			reportDisposalFailure,
+			close: () => {
+				actor.stop()
+				f.stop()
+			}
+		}
+	}
+
+	it('waits for correlated lease observations before constructing financial resources', async () => {
+		const r = resources()
+		try {
+			expect(r.f.queries).toHaveLength(0)
+			expect(r.actor.getSnapshot().children.financial).toBeUndefined()
+			r.actor.send({
+				type: 'OBSERVE',
+				observation: {
+					...r.observation,
+					read: { ...r.observation.read, selection: { workspaceId: b, revision: 2 } }
+				}
+			})
+			expect(r.f.queries).toHaveLength(0)
+			r.actor.send({ type: 'OBSERVE', observation: r.observation })
+			expect(r.f.queries).toHaveLength(1)
+			expect(r.actor.getSnapshot().children.financial).toBeDefined()
+			r.actor.send({ type: 'SHUTDOWN' })
+			await waitFor(r.actor, (snapshot) => snapshot.status === 'done')
+			expect(r.actor.getSnapshot().output).toEqual({ outcome: 'released' })
+			expect(last(r.f.queries).release).toHaveBeenCalledOnce()
+		} finally {
+			r.close()
+		}
+	})
+
+	it('replaces only route reads while keeping financial controllers and ignoring retired callbacks', async () => {
+		const r = resources()
+		try {
+			r.actor.send({ type: 'OBSERVE', observation: r.observation })
+			const financial = r.actor.getSnapshot().children.financial
+			const original = last(r.f.queries)
+			const next: FinanceResourceObservation = {
+				forms: {
+					...r.observation.forms,
+					selectionRevision: 2,
+					observation: { ...r.observation.forms.observation }
+				},
+				read: {
+					...r.observation.read,
+					binding: {},
+					transactionId: '30000000-0000-4000-8000-000000000001',
+					selection: { workspaceId: a, revision: 2 }
+				}
+			}
+			r.actor.send({ type: 'OBSERVE', observation: next })
+			expect(original.release).toHaveBeenCalledOnce()
+			expect(r.f.queries).toHaveLength(2)
+			expect(r.actor.getSnapshot().children.financial).toBe(financial)
+			last(r.f.queries).publish([row('Current route')])
+			original.publish([row('Retired route')])
+			expect(selectFinanceWorkspaceResources(r.actor.getSnapshot()).content?.binding).toBe(
+				next.read.binding
+			)
+			expect(
+				selectFinanceWorkspaceResources(r.actor.getSnapshot()).content?.accounts?.map(
+					(account) => account.name
+				)
+			).toEqual(['Current route'])
+			r.actor.send({ type: 'SHUTDOWN' })
+			await waitFor(r.actor, (snapshot) => snapshot.status === 'done')
+			expect(last(r.f.queries).release).toHaveBeenCalledOnce()
+		} finally {
+			r.close()
+		}
+	})
+
+	it('retains unresolved native custody rather than closing after query disposal failure', () => {
+		const r = resources('disposal')
+		try {
+			r.actor.send({ type: 'OBSERVE', observation: r.observation })
+			r.actor.send({ type: 'SHUTDOWN' })
+			expect(selectFinanceWorkspaceResources(r.actor.getSnapshot()).failed).toBe(true)
+			expect(r.reportDisposalFailure).toHaveBeenCalledOnce()
+			expect(r.actor.getSnapshot().status).toBe('active')
+			expect(r.actor.getSnapshot().output).toBeUndefined()
+			r.actor.send({ type: 'SHUTDOWN' })
+			expect(r.actor.getSnapshot().output).toBeUndefined()
+		} finally {
+			r.close()
+		}
+	})
+	it('retains live content custody after unexpected financial completion', async () => {
+		const r = resources()
+		try {
+			r.actor.send({ type: 'OBSERVE', observation: r.observation })
+			const financial = r.actor.getSnapshot().children.financial
+			if (!financial) throw new Error('Missing admitted financial owner')
+			financial.send({ type: 'SHUTDOWN' })
+			await waitFor(r.actor, (snapshot) => selectFinanceWorkspaceResources(snapshot).failed)
+			expect(last(r.f.queries).release).not.toHaveBeenCalled()
+			expect(r.actor.getSnapshot().children.queries?.getSnapshot().status).toBe('active')
+			r.actor.send({ type: 'SHUTDOWN' })
+			expect(r.actor.getSnapshot().output).toBeUndefined()
+			expect(last(r.f.queries).release).not.toHaveBeenCalled()
+		} finally {
+			r.close()
+		}
+	})
+
+	it('treats unsolicited query completion as failure while retaining financial ownership', async () => {
+		const r = resources()
+		try {
+			r.actor.send({ type: 'OBSERVE', observation: r.observation })
+			const financial = r.actor.getSnapshot().children.financial
+			const queries = r.actor.getSnapshot().children.queries
+			if (!queries) throw new Error('Missing admitted query owner')
+			queries.send({ type: 'SHUTDOWN' })
+			expect(selectFinanceWorkspaceResources(r.actor.getSnapshot()).failed).toBe(true)
+			expect(last(r.f.queries).release).toHaveBeenCalledOnce()
+			expect(r.actor.getSnapshot().children.financial).toBe(financial)
+			expect(financial?.getSnapshot().status).toBe('active')
+			r.actor.send({ type: 'SHUTDOWN' })
+			expect(r.actor.getSnapshot().output).toBeUndefined()
+		} finally {
+			r.close()
+		}
+	})
 })
