@@ -588,4 +588,63 @@ the overview defaults to the latest 30 days: the row fell outside that range on
 November 24 UTC while still appearing in the local November 23 range. That test
 now selects an explicit October period through the existing UI before asserting
 the same $1.00 total. The targeted native browser case passed. These are narrow
-configuration/fixture corrections; hosted requalification remains required.
+configuration/fixture corrections. Hosted requalification on `2d128916` passed
+all Foundation, Clipper and Finance workflows, including both previously failing
+browser jobs. This qualifies that pushed head, separately from the access-owner
+extraction below.
+
+## Finance access-observation boundary
+
+The next source extraction follows the three-file batch listed in
+`selection-integration.md`. `worker-workspace-access.ts` now owns the existing
+profile, directory, target workspace and membership observers. It receives an
+admitted native binding/target, retains the existing cached identity/directory
+inputs, publishes a correlated facts selector and distinguishes unknown/null
+rows from failed reads. It issues no workspace lease or eligibility verdict.
+
+`worker-queries.ts` composes those facts with its remaining financial content
+reads. It checks the access facts' binding before consumption and preserves the
+existing aggregate read-failure behavior and combined query-view contract. The
+Finance event projection over DLF's observation factory is shared by both groups
+through `worker-query-observation.ts`; there is no duplicated subscription or
+disposal lifecycle. Financial schemas, native query construction and policy stay
+in Finance. The original `FinanceWorkerReady` type export is retained.
+
+This is a source ownership boundary, not yet a lifetime cutover. The current
+query owner still invokes the access group. The future shared selection host
+will place it outside selected content resources so permission loss and unknown
+access remain observable while content drains. Forms, startup/seed controllers,
+route retention, financial writes and their native drain acknowledgements have
+not changed in this batch.
+
+The user approved qualification of the displayed source extraction with
+“continue” after the implementation-review handoff. Required
+qualification includes cached profile/directory startup, global/no-target reads,
+unknown and denied target facts, read/construction failure propagation, disposal
+failure, foreign bindings and old callbacks after A → B → A. Existing Finance
+worker, workspace, permission, native offline/authority and retained-form tests
+must qualify this new composition rather than relying on the earlier flat query
+owner's results.
+
+Source-stage verification passed: Finance source checks (zero Svelte errors or
+warnings), test-fixture TypeScript checks and the production build. These are
+static/build checks only; behavior qualification is recorded separately below.
+
+Qualification after review passed:
+
+- 102 Finance worker tests. The 18 added cases cover cached/global access facts,
+  unknown versus absent target evidence, all four subscription construction/read/
+  disposal failure sources, foreign bindings and retired A → B → A callbacks,
+  parent content withdrawal and nested access-disposal failure during host close.
+- 49 production browser cases across `multiple-workspaces.e2e.ts`,
+  `permissions.e2e.ts` and `workflow-completion.e2e.ts`, including selection,
+  observed membership loss, native authorization, retained forms and offline saves.
+- Four production startup cases with disposable native authorities/profiles:
+  cold browser restart offline, cold restart with an open unanswered connection,
+  an established connection becoming unanswered and real later permission rejection
+  after a locally successful save.
+
+No retries, longer timeouts or weakened assertions were required. The shared DLF
+implementation is unchanged in this slice. Its previously qualified observation
+factory remains the subscription/disposal owner for both app consumers. New-head
+hosted checks remain separate from these local results.

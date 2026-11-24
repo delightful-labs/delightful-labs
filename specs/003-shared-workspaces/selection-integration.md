@@ -121,6 +121,32 @@ Keep the shared engineering review/test gate; prior startup qualification does
 not qualify these new lifetimes. No dependency, schema migration, data reset,
 workspace UI or product wording change is needed for this design.
 
+## Next source boundary: Finance workspace access observations
+
+The first part of batch 2 changes three source files:
+
+- `apps/finance/src/lib/machines/runtime/worker-query-observation.ts`: the thin
+  Finance event/binding projection over DLF's qualified observation factory.
+- `apps/finance/src/lib/machines/runtime/worker-workspace-access.ts`: the existing
+  profile, directory, selected-workspace and membership subscription group, with
+  an explicit correlated facts selector and its original read/disposal failures.
+- `apps/finance/src/lib/machines/runtime/worker-queries.ts`: compose the access
+  group and the remaining financial reads, preserving the current combined view.
+
+Access facts remain app-owned native/schema observations, not shared role policy.
+The access group has the caller's admitted binding/target as immutable input;
+it owns subscription acquisition, current callbacks and disposal for that input.
+Parent composition consumes its public facts, rejects foreign binding reports,
+and retains the existing aggregate read-failure behavior. Unknown rows and cached
+identity/directory facts keep their existing meanings. No directory absence or
+root/bootstrap provenance becomes an access grant.
+
+This first extraction preserves the current invocation lifetime. It exposes a
+separate access owner so the later shared selection host can keep it alive outside
+selected content resources without cloning queries or eligibility decisions.
+It does not claim that access already outlives the content owner, nor does it
+change route retention, native sessions or financial mutation/drain protocols.
+
 ## Required qualification
 
 Retain the existing startup, offline-restoration, seed and extension checks. Add

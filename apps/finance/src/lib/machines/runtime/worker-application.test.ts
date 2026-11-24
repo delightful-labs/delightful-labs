@@ -45,6 +45,10 @@ import { createFinanceFormsMachine } from './worker-forms.js'
 import { app } from '../../queries.js'
 import type { WorkerFormCommand } from '../../contracts/worker-forms.js'
 import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
+import {
+	financeWorkspaceAccessMachine,
+	selectFinanceWorkspaceAccessFacts
+} from './worker-workspace-access.js'
 
 beforeEach(() => {
 	const events = new EventTarget()
@@ -469,6 +473,207 @@ function last<T>(rows: T[]): T {
 	if (!value) throw new Error('Missing test observation')
 	return value
 }
+
+describe('Finance access observations composed through DLF', () => {
+	function accessFixture(fault?: { source: string; stage: 'construction' | 'disposal' }) {
+		const native = fixture()
+		const subscriptions: {
+			source: string
+			emit: () => void
+			failed: () => void
+			release: ReturnType<typeof vi.fn>
+		}[] = []
+		function subscribe(source: string, emit: () => void, failed: () => void) {
+			if (fault?.source === source && fault.stage === 'construction')
+				throw new Error('Cannot subscribe')
+			const release = vi.fn(() => {
+				if (fault?.source === source && fault.stage === 'disposal')
+					throw new Error('Cannot dispose')
+			})
+			subscriptions.push({ source, emit, failed, release })
+			return release
+		}
+		const admitted = native.ready({})
+		const ready = {
+			...admitted,
+			capabilities: {
+				...admitted.capabilities,
+				observeProfile: ((publish, failed) =>
+					subscribe(
+						'profile',
+						() => publish(null),
+						failed
+					)) satisfies FinanceWorkerCapabilities['observeProfile'],
+				observeWorkspaces: ((publish, failed) =>
+					subscribe(
+						'directory',
+						() => publish([]),
+						failed
+					)) satisfies FinanceWorkerCapabilities['observeWorkspaces'],
+				observeWorkspace: ((_id, publish, failed) =>
+					subscribe(
+						'workspace',
+						() => publish(null),
+						failed
+					)) satisfies FinanceWorkerCapabilities['observeWorkspace'],
+				observeMembership: ((_id, publish, failed) =>
+					subscribe(
+						'membership',
+						() => publish(null),
+						failed
+					)) satisfies FinanceWorkerCapabilities['observeMembership']
+			}
+		}
+		const disposalFailed = vi.fn()
+		function open(
+			workspaceId: string | null,
+			binding: object = {},
+			initialWorkspaces: WorkerWorkspace[] | null = null
+		) {
+			const owner = createActor(financeWorkspaceAccessMachine, {
+				input: {
+					ready,
+					workspaceId,
+					binding,
+					initialWorkspaces,
+					initialProfile: null,
+					reportDisposalFailure: disposalFailed
+				}
+			})
+			owner.start()
+			return owner
+		}
+		return { open, subscriptions, disposalFailed }
+	}
+	it('keeps cached identity and directory facts on a global route without target subscriptions', () => {
+		const f = accessFixture()
+		const cached: WorkerWorkspace[] = [{ id: a, name: 'Cached A', defaultCurrency: 'USD' }]
+		const owner = f.open(null, {}, cached)
+		try {
+			expect(f.subscriptions.map((s) => s.source)).toEqual(['profile', 'directory'])
+			expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot())).toMatchObject({
+				status: 'observing',
+				profile: null,
+				workspaces: cached,
+				workspace: undefined,
+				membership: undefined
+			})
+			f.subscriptions.forEach((s) => s.emit())
+			expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot()).workspaces).toEqual([])
+		} finally {
+			owner.stop()
+		}
+		expect(f.subscriptions.every((s) => s.release.mock.calls.length === 1)).toBe(true)
+	})
+	it('keeps unknown target evidence distinct from observed absence without granting access from a directory', () => {
+		const f = accessFixture()
+		const owner = f.open(a, {}, [{ id: a, name: 'A', defaultCurrency: 'USD' }])
+		try {
+			expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot())).toMatchObject({
+				workspace: undefined,
+				membership: undefined
+			})
+			f.subscriptions
+				.filter((s) => s.source === 'workspace' || s.source === 'membership')
+				.forEach((s) => s.emit())
+			expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot())).toMatchObject({
+				status: 'observing',
+				workspace: null,
+				membership: null,
+				workspaces: [{ id: a }]
+			})
+		} finally {
+			owner.stop()
+		}
+	})
+	it.each(['profile', 'directory', 'workspace', 'membership'])(
+		'withdraws all facts and disposes observers after %s read failure',
+		(source) => {
+			const f = accessFixture()
+			const owner = f.open(a)
+			try {
+				f.subscriptions.forEach((s) => s.emit())
+				const failed = f.subscriptions.find((s) => s.source === source)
+				if (!failed) throw new Error('Missing source')
+				failed.failed()
+				f.subscriptions.forEach((s) => s.emit())
+				expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot())).toMatchObject({
+					status: 'failed',
+					profile: undefined,
+					workspaces: null,
+					workspace: undefined,
+					membership: undefined
+				})
+				expect(f.subscriptions.every((s) => s.release.mock.calls.length === 1)).toBe(true)
+			} finally {
+				owner.stop()
+			}
+		}
+	)
+	it.each(['profile', 'directory', 'workspace', 'membership'])(
+		'fails closed after %s subscription construction throws',
+		(source) => {
+			const f = accessFixture({ source, stage: 'construction' })
+			const owner = f.open(a)
+			try {
+				expect(selectFinanceWorkspaceAccessFacts(owner.getSnapshot())).toMatchObject({
+					status: 'failed',
+					workspaces: null,
+					profile: undefined
+				})
+				expect(f.subscriptions.every((s) => s.release.mock.calls.length === 1)).toBe(true)
+			} finally {
+				owner.stop()
+			}
+		}
+	)
+	it.each(['profile', 'directory', 'workspace', 'membership'])(
+		'reports %s disposal failure to the native release owner exactly once',
+		(source) => {
+			const f = accessFixture({ source, stage: 'disposal' })
+			const owner = f.open(a)
+			owner.stop()
+			owner.stop()
+			expect(f.disposalFailed).toHaveBeenCalledOnce()
+			expect(f.subscriptions.every((s) => s.release.mock.calls.length === 1)).toBe(true)
+		}
+	)
+	it('rejects foreign reports and retired callbacks across A → B → A', () => {
+		const f = accessFixture()
+		const firstBinding = {}
+		const first = f.open(a, firstBinding)
+		const old = [...f.subscriptions]
+		first.stop()
+		const second = f.open(b)
+		second.stop()
+		const current = f.open(a)
+		try {
+			current.send({
+				type: 'WORKSPACES',
+				binding: firstBinding,
+				rows: [{ id: a, name: 'Retired', defaultCurrency: 'USD' }]
+			})
+			current.send({ type: 'READ_FAILED', binding: firstBinding })
+			old.forEach((s) => {
+				s.emit()
+				s.failed()
+			})
+			expect(selectFinanceWorkspaceAccessFacts(current.getSnapshot())).toMatchObject({
+				status: 'observing',
+				workspaces: null,
+				membership: undefined
+			})
+			f.subscriptions.slice(-4).forEach((s) => s.emit())
+			expect(selectFinanceWorkspaceAccessFacts(current.getSnapshot())).toMatchObject({
+				status: 'observing',
+				workspaces: [],
+				membership: null
+			})
+		} finally {
+			current.stop()
+		}
+	})
+})
 
 describe('Finance worker ownership and selected accounts', () => {
 	it('routes an empty directory back to its original entry when a workspace arrives', async () => {
@@ -1868,6 +2073,30 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.stop()
 		}
 	})
+	it.each(['directory', 'membership'])(
+		'withdraws financial content when the composed access %s read fails',
+		async (source) => {
+			const f = fixture()
+			try {
+				await f.start()
+				f.select(a, 1)
+				last(f.directory).publish([{ id: a, name: 'A' }])
+				const query = last(f.queries)
+				query.publish([row('Visible')])
+				expect(f.view().accounts).toMatchObject([row('Visible')])
+				const access = source === 'directory' ? last(f.directory) : last(f.memberships)
+				access.failed()
+				expect(f.view()).toMatchObject({ status: 'failed', accounts: [], workspaces: null })
+				expect(query.release).toHaveBeenCalledOnce()
+				query.publish([row('Late')])
+				expect(f.view().accounts).toEqual([])
+				expect(f.createWrite).not.toHaveBeenCalled()
+				expect(f.nativeClose).not.toHaveBeenCalled()
+			} finally {
+				f.stop()
+			}
+		}
+	)
 	it('withdraws a failed read and supports a new selected query without replaying any write', async () => {
 		const f = fixture()
 		try {
@@ -2243,25 +2472,29 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.stop()
 		}
 	})
-	it('does not acknowledge clean close when query disposal throws', async () => {
-		const f = fixture()
-		try {
-			await f.start()
-			f.select(a, 1)
-			last(f.queries).release.mockImplementation(() => {
-				throw new Error('Synthetic query disposal failure')
-			})
-			f.actor.send({ type: 'CLOSE' })
-			await waitFor(f.actor, (s) => s.matches('cleanupFailed'))
-			expect(f.actor.getSnapshot().output).toBeUndefined()
-			expect(f.closeAccountStore).not.toHaveBeenCalled()
-			expect(f.closeBroker).not.toHaveBeenCalled()
-			f.actor.send({ type: 'CLOSE' })
-			expect(f.actor.getSnapshot().matches('cleanupFailed')).toBe(true)
-		} finally {
-			f.stop()
+	it.each(['query', 'access directory'])(
+		'does not acknowledge clean close when %s disposal throws',
+		async (source) => {
+			const f = fixture()
+			try {
+				await f.start()
+				f.select(a, 1)
+				const subscription = source === 'query' ? last(f.queries) : last(f.directory)
+				subscription.release.mockImplementation(() => {
+					throw new Error('Synthetic subscription disposal failure')
+				})
+				f.actor.send({ type: 'CLOSE' })
+				await waitFor(f.actor, (s) => s.matches('cleanupFailed'))
+				expect(f.actor.getSnapshot().output).toBeUndefined()
+				expect(f.closeAccountStore).not.toHaveBeenCalled()
+				expect(f.closeBroker).not.toHaveBeenCalled()
+				f.actor.send({ type: 'CLOSE' })
+				expect(f.actor.getSnapshot().matches('cleanupFailed')).toBe(true)
+			} finally {
+				f.stop()
+			}
 		}
-	})
+	)
 	it('withdraws retained rows when the host is forcibly stopped without fabricating native close', async () => {
 		const f = fixture()
 		try {

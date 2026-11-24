@@ -2,10 +2,7 @@ import type { BankSource } from '../bank-sync/types.js'
 import type { WorkerTransferRecord } from '../../contracts/worker-transfers.js'
 import type { workerWorkspaceMember, workerAccountGrant } from '../../contracts/worker-accounts.js'
 import { setup, types, type SnapshotFrom } from 'xstate'
-import { createBoundObservationLogic } from 'delightful-local-first/data/observation-workflow'
-import type { SessionRuntimeObservation } from 'delightful-local-first/session/runtime'
 import type {
-	FinanceWorkerCapabilities,
 	WorkerSelection,
 	WorkerWorkspace,
 	WorkerAccountRecord,
@@ -13,18 +10,23 @@ import type {
 } from '../../contracts/worker-application.js'
 import type { TransactionEntryObservation } from '../../contracts/transaction-entry-contract.js'
 import type { z } from 'zod'
-import type { workerProfile, workerWorkspaceSettings } from '../../contracts/worker-application.js'
 import type { Category, Tag } from '../../queries.js'
 import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
 
-export type FinanceWorkerReady = Extract<
-	SessionRuntimeObservation<FinanceWorkerCapabilities>,
-	{ status: 'ready' }
->
+import {
+	observeFinanceQuery as observeQuery,
+	type FinanceWorkerReady
+} from './worker-query-observation.js'
+import {
+	financeWorkspaceAccessMachine,
+	selectFinanceWorkspaceAccessFacts,
+	type WorkspaceAccessRows
+} from './worker-workspace-access.js'
+export type { FinanceWorkerReady } from './worker-query-observation.js'
 type Input = {
 	ready: FinanceWorkerReady
 	initialWorkspaces: WorkerWorkspace[] | null
-	initialProfile?: z.output<typeof workerProfile> | null | undefined
+	initialProfile?: WorkspaceAccessRows['profile']
 	transactionId: string | null
 	selection: WorkerSelection
 	binding: object
@@ -47,17 +49,13 @@ const empty = {
 	transaction: undefined,
 	transactions: null
 }
-type Rows = {
+type Rows = WorkspaceAccessRows & {
 	bankConnections: BankSource['connections'] | null
 	bankLinks: BankSource['links'] | null
 	transfers: WorkerTransferRecord[] | null
 	workspaceMembers: z.output<typeof workerWorkspaceMember>[] | null
 	accountGrants: z.output<typeof workerAccountGrant>[] | null
-	profile: z.output<typeof workerProfile> | null | undefined
-	workspace: z.output<typeof workerWorkspaceSettings> | null | undefined
-	workspaces: WorkerWorkspace[] | null
 	accounts: WorkerAccountRecord[] | null
-	membership: ArchiveObservation['membership']
 	grants: ArchiveObservation['grants'] | null
 	categories: Category[] | null
 	tags: Tag[] | null
@@ -66,50 +64,12 @@ type Rows = {
 }
 export type FinanceQueryFacts = Rows & { binding: object; status: 'loading' | 'ready' | 'failed' }
 
-/** One native subscription per invoked actor; failures and release stay with its owner. */
-function observeQuery<Result>(
-	event:
-		| 'BANK_CONNECTIONS'
-		| 'BANK_LINKS'
-		| 'TRANSFERS'
-		| 'WORKSPACE_MEMBERS'
-		| 'ACCOUNT_GRANTS'
-		| 'PROFILE'
-		| 'WORKSPACE'
-		| 'WORKSPACES'
-		| 'ACCOUNTS'
-		| 'MEMBERSHIP'
-		| 'GRANTS'
-		| 'CATEGORIES'
-		| 'TAGS'
-		| 'TRANSACTIONS'
-		| 'TRANSACTION'
-) {
-	return createBoundObservationLogic<
-		Result,
-		{
-			binding: object
-			observe: ((publish: (result: Result) => void, failed: () => void) => () => void) | undefined
-			reportDisposalFailure: () => void
-		},
-		{ type: typeof event; binding: object; rows: Result } | { type: 'READ_FAILED'; binding: object }
-	>({
-		observe: (input, publish, failed) => input.observe?.(publish, failed),
-		observed: (input, rows) => ({ type: event, binding: input.binding, rows }),
-		failed: (input) => ({ type: 'READ_FAILED', binding: input.binding }),
-		disposalFailed: (input) => input.reportDisposalFailure()
-	})
-}
 const bankConnections = observeQuery<Rows['bankConnections']>('BANK_CONNECTIONS')
 const bankLinks = observeQuery<Rows['bankLinks']>('BANK_LINKS')
 const transfers = observeQuery<Rows['transfers']>('TRANSFERS')
 const workspaceMembers = observeQuery<Rows['workspaceMembers']>('WORKSPACE_MEMBERS')
 const accountGrants = observeQuery<Rows['accountGrants']>('ACCOUNT_GRANTS')
-const profile = observeQuery<Rows['profile']>('PROFILE')
-const workspace = observeQuery<Rows['workspace']>('WORKSPACE')
-const workspaces = observeQuery<WorkerWorkspace[]>('WORKSPACES')
 const accounts = observeQuery<WorkerAccountRecord[]>('ACCOUNTS')
-const membership = observeQuery<ArchiveObservation['membership']>('MEMBERSHIP')
 const grants = observeQuery<ArchiveObservation['grants']>('GRANTS')
 const categories = observeQuery<Category[]>('CATEGORIES')
 const tags = observeQuery<Tag[]>('TAGS')
@@ -126,11 +86,7 @@ export const financeQueriesMachine = setup({
 			TRANSFERS: types<{ binding: object; rows: Rows['transfers'] }>(),
 			WORKSPACE_MEMBERS: types<{ binding: object; rows: Rows['workspaceMembers'] }>(),
 			ACCOUNT_GRANTS: types<{ binding: object; rows: Rows['accountGrants'] }>(),
-			PROFILE: types<{ binding: object; rows: Rows['profile'] }>(),
-			WORKSPACE: types<{ binding: object; rows: Rows['workspace'] }>(),
-			WORKSPACES: types<{ binding: object; rows: WorkerWorkspace[] }>(),
 			ACCOUNTS: types<{ binding: object; rows: WorkerAccountRecord[] }>(),
-			MEMBERSHIP: types<{ binding: object; rows: ArchiveObservation['membership'] }>(),
 			GRANTS: types<{ binding: object; rows: ArchiveObservation['grants'] }>(),
 			CATEGORIES: types<{ binding: object; rows: Category[] }>(),
 			TAGS: types<{ binding: object; rows: Tag[] }>(),
@@ -140,16 +96,13 @@ export const financeQueriesMachine = setup({
 		}
 	},
 	actors: {
+		workspaceAccess: financeWorkspaceAccessMachine,
 		bankConnections,
 		bankLinks,
 		transfers,
 		workspaceMembers,
 		accountGrants,
-		profile,
-		workspace,
-		workspaces,
 		accounts,
-		membership,
 		grants,
 		categories,
 		tags,
@@ -168,6 +121,32 @@ export const financeQueriesMachine = setup({
 	states: {
 		running: {
 			invoke: [
+				{
+					id: 'workspaceAccess',
+					src: 'workspaceAccess',
+					input: ({ context }) => ({
+						ready: context.ready,
+						workspaceId: context.selection.workspaceId,
+						binding: context.binding,
+						initialWorkspaces: context.initialWorkspaces,
+						initialProfile: context.initialProfile,
+						reportDisposalFailure: context.reportDisposalFailure
+					}),
+					onSnapshot: ({ context, event }) => {
+						const facts = selectFinanceWorkspaceAccessFacts(event.snapshot)
+						if (facts.binding !== context.binding) return
+						if (facts.status === 'failed') return { target: 'failed', context: empty }
+						return {
+							context: {
+								profile: facts.profile,
+								workspace: facts.workspace,
+								workspaces: facts.workspaces,
+								membership: facts.membership
+							}
+						}
+					},
+					onError: { target: 'failed', context: empty }
+				},
 				{
 					src: 'bankConnections',
 					input: ({ context }) => ({
@@ -233,35 +212,7 @@ export const financeQueriesMachine = setup({
 					}),
 					onError: { target: 'failed', context: empty }
 				},
-				{
-					src: 'profile',
-					input: ({ context }) => ({
-						...context,
-						observe: context.ready.capabilities.observeProfile
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-				{
-					src: 'workspace',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeWorkspace.bind(
-									null,
-									context.selection.workspaceId
-								)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
-				{
-					src: 'workspaces',
-					input: ({ context }) => ({
-						...context,
-						observe: context.ready.capabilities.observeWorkspaces
-					}),
-					onError: { target: 'failed', context: empty }
-				},
+
 				{
 					src: 'accounts',
 					input: ({ context }) => ({
@@ -272,19 +223,7 @@ export const financeQueriesMachine = setup({
 					}),
 					onError: { target: 'failed', context: empty }
 				},
-				{
-					src: 'membership',
-					input: ({ context }) => ({
-						...context,
-						observe: context.selection.workspaceId
-							? context.ready.capabilities.observeMembership.bind(
-									null,
-									context.selection.workspaceId
-								)
-							: undefined
-					}),
-					onError: { target: 'failed', context: empty }
-				},
+
 				{
 					src: 'grants',
 					input: ({ context }) => ({
@@ -364,16 +303,10 @@ export const financeQueriesMachine = setup({
 					event.binding === context.binding
 						? { context: { accountGrants: event.rows } }
 						: undefined,
-				PROFILE: ({ context, event }) =>
-					event.binding === context.binding ? { context: { profile: event.rows } } : undefined,
-				WORKSPACE: ({ context, event }) =>
-					event.binding === context.binding ? { context: { workspace: event.rows } } : undefined,
-				WORKSPACES: ({ context, event }) =>
-					event.binding === context.binding ? { context: { workspaces: event.rows } } : undefined,
+
 				ACCOUNTS: ({ context, event }) =>
 					event.binding === context.binding ? { context: { accounts: event.rows } } : undefined,
-				MEMBERSHIP: ({ context, event }) =>
-					event.binding === context.binding ? { context: { membership: event.rows } } : undefined,
+
 				GRANTS: ({ context, event }) =>
 					event.binding === context.binding ? { context: { grants: event.rows } } : undefined,
 				CATEGORIES: ({ context, event }) =>
