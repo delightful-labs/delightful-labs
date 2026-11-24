@@ -321,3 +321,10 @@ Browsers supply no asynchronous process-exit receipt for these finite workers.
 Persistent Jazz/application workers and financial write custody retain their own
 real drain/close protocols. Do not start a job actor inside a promise leaf and
 await it as an adapter for an old promise API.
+
+## Selected resource ownership
+
+Use [`workspace/resource`](workspace-resources.md) to compose the existing workspace
+selector with one concrete app resource group and its actual shutdown receipts.
+Keep identity/access observations outside selected content resources. The shared
+owner coordinates leases and drain; domain schemas and operations stay in the app.

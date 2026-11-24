@@ -45,7 +45,8 @@
 		"./workspace-seed.ts",
 		"./workspace-startup.ts",
 		"./workspace-initialization.ts",
-		"./bound-observation.ts"
+		"./bound-observation.ts",
+		"./workspace-resource.ts"
 	],
 	"exclude": []
 }

@@ -744,3 +744,43 @@ form cases, nine worker cases across Chromium/Firefox/WebKit and four cold/offli
 unanswered-authority/later-permission-rejection cases. Final source and test types,
 formatting and whitespace checks passed. This is not yet shared lease adoption;
 new-head hosted qualification remains separate from local evidence.
+
+## Shared selected-resource owner
+
+`workspace/resource` now exports `createWorkspaceResourceOwner`, with public
+contracts under `workspace/resource-contracts`. It invokes the existing shared
+selector for one fixed native attachment and one concrete app resource actor.
+The app supplies pure input/view/failure/receipt projections and a typed shutdown
+command. Both source and public consumers retain complete concrete event/input/
+snapshot/output types without assertions or XState patches.
+
+The owner enforces exact-lease command admission, withdraws it on invalidation,
+issues resource shutdown once, retains the exact selector drain token and waits
+for real settlement before replacement. Pending selection stays with the existing
+selector. Shutdown wins pending replacement. Active failed/crashed resources,
+missing/unresolved output and selector failure cannot fabricate clean release;
+live unresolved resources stay invoked. Unexpected but demonstrably released
+completion reaches the selector's explicit-retry failure path. Public reports
+retain correlated scope/lease/receipt facts and never expose an old resource view
+as a new activation.
+
+Qualification passed: all 1,340 DLF tests across 66 files, including 22 new cases
+and 100 generated pending-request schedules (seed 20261124). The controlled
+resource records commands during drain and every shutdown delivery, so its own
+refusals cannot mask owner defects. Real parent bursts cover immediate selection/
+access invalidation followed by a retired command. Selector crash, unsolicited
+closure, missing/unknown receipts and retained live failed resources are covered.
+An owned-payload case proves refused commands release exactly once before
+selection, during invalidation/closing and under unresolved custody; admitted
+commands reach the resource instead. A parent burst preserves host-close priority
+after unsolicited resource completion. Apps supply payload cleanup through the
+optional queued refusal leaf.
+Full source/Svelte/test types pass with zero diagnostics; scoped formatting/lint,
+package/publint and complete public consumers pass. The new public producer also
+passes from an actual packed package, including concrete command type refusals,
+execution through held replacement/close and self-contained ES-module workers.
+
+This shared owner is not yet adopted by production apps. Finance must bind its
+financial/resource group first and remove the corresponding manual decisions;
+Clipper must then consume the same implementation. Native app qualification and
+remaining independent-replica canonical startup proof remain required.
