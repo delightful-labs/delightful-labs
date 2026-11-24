@@ -28,7 +28,7 @@ import {
 	type WorkerFormCommand,
 	type FinanceFormsObservation
 } from '../../contracts/worker-forms.js'
-import type { FinanceFormsDependencies } from './worker-forms.js'
+import type { FinanceIdentityDependencies } from './worker-form-dependencies.js'
 
 type InitializationResult = OutputFrom<typeof workspaceInitialization>
 const workspaceStartup = createWorkspaceStartupOwner<
@@ -57,7 +57,7 @@ type Context = Input & {
 	seedClosed: boolean
 	initialization: InitializationResult | undefined
 }
-export function createFinanceIdentityControlsMachine(dependencies: FinanceFormsDependencies) {
+export function createFinanceIdentityControlsMachine(dependencies: FinanceIdentityDependencies) {
 	const workspaceCreation = createWorkspaceCreationMachine(dependencies.db)
 	const profileName = createScopedFormMachine(dependencies.profile.name)
 	const profileAvatar = createScopedFormMachine(dependencies.profile.avatar)

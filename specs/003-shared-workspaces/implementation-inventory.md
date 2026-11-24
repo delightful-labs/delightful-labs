@@ -713,3 +713,34 @@ later-permission-rejection cases, and nine native worker cases across Chromium,
 Firefox and WebKit (initialization/offline marker reuse, navigation drain and held
 archive before native close). All retained their existing assertions/timeouts;
 no retries were needed. New-head hosted qualification remains separate.
+
+## Financial controller resource group
+
+`worker-financial-controls.ts` now owns the financial domain children and their
+existing parallel drain receipts. It consumes initialization as a typed fact and
+has no startup, seeding, profile, workspace-creation or navigation children.
+`worker-form-dependencies.ts` derives narrower identity and financial dependency
+sets; the financial owner cannot access those identity controller dependencies.
+
+`worker-forms.ts` is now a composition of the two groups, retaining the current
+worker command/view contract and refusing file/transfer resources through the
+existing fallback paths. It forwards observations and initialization facts,
+classifies active child failures, ignores successful terminal snapshots until
+terminal receipt handling, and waits independently for both aggregate receipts.
+No domain write, role, validation or persistence policy was rewritten.
+
+All 107 worker tests pass. One new case holds a profile save and financial archive
+simultaneously, settles the financial group first, and proves native SDK/store
+closure still waits for the identity receipt. Existing forced child completion,
+unknown startup settlement, held creation/archive, restoration and navigation
+cases pass. Source and test-fixture type checks pass with zero Svelte diagnostics.
+The other new case catches an older financial success being published under newer
+workspace observations. Financial public reports now pair the view with its exact
+observation; the facade only consumes a currently correlated pair. Temporarily
+removing that guard made the regression fail with the old workspace's success
+visible three times under the new scope. The corrected full worker suite passes.
+The corrected source passed 62 native browser cases: the 49 workspace/permission/
+form cases, nine worker cases across Chromium/Firefox/WebKit and four cold/offline/
+unanswered-authority/later-permission-rejection cases. Final source and test types,
+formatting and whitespace checks passed. This is not yet shared lease adoption;
+new-head hosted qualification remains separate from local evidence.

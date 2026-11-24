@@ -41,7 +41,7 @@ import { creationFixture as workspaceCreationFixture } from '../workspaces/works
 import type { InputFrom } from 'xstate'
 import type { workspaceInitialization } from '../workspaces/workspace-initialization.js'
 import { creationFixture } from '../transactions/transaction-create.fixture.js'
-import { createFinanceFormsMachine } from './worker-forms.js'
+import { createFinanceFormsMachine, selectFinanceFormsView } from './worker-forms.js'
 import { app } from '../../queries.js'
 import type { WorkerFormCommand } from '../../contracts/worker-forms.js'
 import type { ArchiveObservation } from '../accounts/account-archive-operation.js'
@@ -1371,6 +1371,94 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.stop()
 		}
 	})
+
+	it('waits independently for both identity and financial receipts before native closure', async () => {
+		const f = fixture(),
+			profile = Promise.withResolvers<void>(),
+			archive = Promise.withResolvers<void>()
+		f.saveProfileName.mockImplementation(() => profile.promise)
+		f.archiveWrite.mockImplementation(() => archive.promise)
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.directory).publish([{ id: a, name: 'A' }])
+			last(f.queries).publish([row('Wallet')])
+			const scope = f.view()
+			f.actor.send({
+				type: 'PROFILE',
+				form: 'name',
+				command: { type: 'SUBMIT', values: { displayName: 'Held profile' } },
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			f.actor.send({
+				type: 'ARCHIVE_ACCOUNT',
+				accountId: row('Wallet').id,
+				selection: scope.selection,
+				sessionRevision: scope.sessionRevision
+			})
+			await vi.waitFor(() => {
+				expect(f.saveProfileName).toHaveBeenCalledOnce()
+				expect(f.archiveWrite).toHaveBeenCalledOnce()
+			})
+			f.actor.send({ type: 'CLOSE' })
+			archive.resolve()
+			await vi.waitFor(() =>
+				expect(
+					f.actor
+						.getSnapshot()
+						.context.forms?.owner.getSnapshot()
+						.matches({ closing: { financial: 'closed' } })
+				).toBe(true)
+			)
+			expect(f.nativeClose).not.toHaveBeenCalled()
+			expect(f.closeAccountStore).not.toHaveBeenCalled()
+			profile.resolve()
+			await waitFor(f.actor, (s) => s.status === 'done')
+			expect(f.nativeClose).toHaveBeenCalledOnce()
+			expect(f.saveProfileName).toHaveBeenCalledOnce()
+			expect(f.archiveWrite).toHaveBeenCalledOnce()
+		} finally {
+			profile.resolve()
+			archive.resolve()
+			f.stop()
+		}
+	})
+
+	it('never publishes an old financial success under newer workspace observations', async () => {
+		const f = fixture()
+		let subscription: { unsubscribe: () => void } | undefined
+		try {
+			await f.start()
+			f.select(a, 1)
+			last(f.directory).publish([
+				{ id: a, name: 'A' },
+				{ id: b, name: 'B' }
+			])
+			last(f.queries).publish([])
+			f.create({ type: 'SUBMIT', values: { name: 'Only A', kind: 'cash', currency: 'USD' } })
+			await vi.waitFor(() => expect(f.view().accountCreation?.content.kind).toBe('success'))
+			const owner = f.actor.getSnapshot().context.forms?.owner
+			if (!owner) throw new Error('Missing form owner')
+			const results: string[] = []
+			let observedNewScope = 0
+			subscription = owner.subscribe((snapshot) => {
+				if (snapshot.context.observation.creation.organizationId !== b) return
+				observedNewScope += 1
+				const view = selectFinanceFormsView(snapshot)
+				if (view.creation?.content.kind === 'success')
+					results.push(view.creation.content.value.name)
+			})
+			f.select(b, 2)
+			last(f.queries).publish([])
+			expect(observedNewScope).toBeGreaterThan(0)
+			expect(results).not.toContain('Only A')
+			expect(f.createWrite).toHaveBeenCalledOnce()
+		} finally {
+			subscription?.unsubscribe()
+			f.stop()
+		}
+	})
 	it('retains issued initialization writes until local settlement before closing the SDK', async () => {
 		const initial = workspaceCreationFixture(),
 			pending = Promise.withResolvers<void>()
@@ -2009,6 +2097,7 @@ describe('Finance worker ownership and selected accounts', () => {
 					f.actor
 						.getSnapshot()
 						.context.forms?.owner.getSnapshot()
+						.children.financial?.getSnapshot()
 						.matches({ closing: { archive: 'closed' } })
 				).toBe(true)
 			)
@@ -2494,6 +2583,7 @@ describe('Finance worker ownership and selected accounts', () => {
 			f.actor
 				.getSnapshot()
 				.context.forms?.owner.getSnapshot()
+				.children.financial?.getSnapshot()
 				.children.archive?.send({ type: 'SHUTDOWN' })
 			await waitFor(f.actor, (snapshot) => snapshot.matches('drainFailed'))
 			f.actor.send({ type: 'CLOSE' })

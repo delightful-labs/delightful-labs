@@ -232,3 +232,55 @@ financial controller and content observers become the app-supplied resource grou
 Clipper supplies its existing library shutdown receipt and domain observations to
 the same implementation. Production adoption must remove the corresponding manual
 replacement/drain decisions in both apps rather than leaving competing owners.
+
+## Financial controller resource group
+
+Extract the current financial children and aggregate terminal receipt into
+`worker-financial-controls.ts`. Native dependency types move to
+`worker-form-dependencies.ts`; identity controls consume that type directly.
+`worker-forms.ts` becomes a small composition of the identity and financial
+owners, retaining its existing production input, command and public-view contract.
+The financial owner consumes initialization as a typed fact; it never owns or
+restarts identity startup/seed/profile/navigation resources.
+
+Both owners receive current observations while active. Identity initialization
+updates reach financial integrity through an explicit typed observation. Whole
+native shutdown requests both groups once and waits for both terminal receipts.
+An active group failing or completing unexpectedly fails the composition. Child
+terminal snapshots during an expected close must not be reclassified as failures
+before their terminal receipt is consumed. Commands carrying file/transfer
+resources retain existing refusal/release behavior outside active ownership.
+
+This grouping exposes the concrete financial resource for the shared workspace
+owner. Its current compatibility composition will be removed from production
+when the application adopts shared leases and keeps identity outside that owner.
+
+## Production resource binding
+
+Keep the native application owner and its existing ordered SDK shutdown. The
+forms composition is the native-bound integration point for identity controls
+outside the shared selected-resource owner. Replace its direct financial invoke
+with that shared owner; do not add another target/drain algorithm in the app.
+An app-owned workspace resource group combines financial content observations
+with the exported financial controller. It owns their native shutdown receipts.
+
+Move the application's financial query invocation under that resource group.
+Publish correlated content facts back to the application for its existing pure
+access/data/form projections; forward current observations back to the admitted
+group. Financial read replacement remains subordinate to the workspace lease,
+so same-workspace routing can retain financial forms and restart only relevant
+reads. Access observations stay outside the selected group. Global identity
+controls remain usable without any selected resource.
+
+Derive selection evidence from existing Finance target-specific membership facts,
+never directory absence or startup provenance. UI route revisions and content
+read bindings remain distinct from native attachment, selection attempt and lease
+epoch. Reject facts/views from retired leases before exposing them. Keep native
+subscription disposal failure visible to both the resource owner (no replacement)
+and the native host (no clean SDK close).
+
+A domain resource can remain active in a failed state without a close receipt.
+The shared owner must publish unresolved ownership and retain that invocation;
+it must not wait for a dead actor, fabricate a terminal receipt or acquire a
+replacement. A real terminal unresolved receipt is likewise retained and reported.
+Only demonstrated release can acknowledge the selector's exact drain token.
